@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"gopkg.in/src-d/go-git.v4/plumbing/storer"
+
 	"gopkg.in/src-d/go-git.v4/plumbing"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 
@@ -65,25 +67,55 @@ func main() {
 		return
 	}
 
-	fmt.Printf("There are %d branches\n", len(branchHeads))
-
-	for branchName, branchHead := range branchHeads {
-		fmt.Printf("Branch %s head is: %s\n", branchName, branchHead)
-	}
-
 	nonMasterBranchRefs := branchHeads
 
 	delete(nonMasterBranchRefs, "master")
 
 	masterCommits, err := repo.Log(&git.LogOptions{From: branchHeads["master"]})
 
+	mergedBranches := make([]string, 1)
+
+	bs, err := remoteBranches(repo.Storer)
+
+	remoteBranchHeads := make(map[string]plumbing.Hash)
+
+	err = bs.ForEach(func(b *plumbing.Reference) error {
+		remoteBranchName := strings.TrimPrefix(b.Name().String(), "refs/remotes/")
+		remoteBranchHead := b.Hash()
+		remoteBranchHeads[remoteBranchName] = remoteBranchHead
+		return nil
+	})
+
+	for branchName, branchHead := range remoteBranchHeads {
+		log.Infof("Remote Branch %s head is: %s\n", branchName, branchHead)
+	}
+
 	err = masterCommits.ForEach(func(commit *object.Commit) error {
-		for branchName, branchHead := range nonMasterBranchRefs {
+		for branchName, branchHead := range remoteBranchHeads {
+			log.Infof("Comparing branch %s head (%s) compared to master commit (%s)", branchName, branchHead, commit.Hash)
 			if branchHead.String() == commit.Hash.String() {
-				fmt.Printf("Branch %s head (%s) was found in master, so has been merged!\n", branchName, branchHead)
+				log.Infof("Branch %s head (%s) was found in master, so has been merged!\n", branchName, branchHead)
+				mergedBranches = append(mergedBranches, branchName)
 			}
 		}
 		return nil
 	})
 
+	fmt.Println("Remote branches merged into master are:")
+
+	for _, branchName := range mergedBranches {
+		log.Infof("%s\n", branchName)
+	}
+
+}
+
+func remoteBranches(s storer.ReferenceStorer) (storer.ReferenceIter, error) {
+	refs, err := s.IterReferences()
+	if err != nil {
+		return nil, err
+	}
+
+	return storer.NewReferenceFilteredIter(func(ref *plumbing.Reference) bool {
+		return ref.Name().IsRemote()
+	}, refs), nil
 }
