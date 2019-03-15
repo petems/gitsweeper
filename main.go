@@ -18,7 +18,13 @@ import (
 )
 
 var (
-	debug = kingpin.Flag("debug", "Enable debug mode.").Bool()
+	app = kingpin.New("gitsweeper", "A command-line tool for cleaning up merged branches.")
+
+	debug = app.Flag("debug", "Enable debug mode.").Bool()
+
+	preview = app.Command("preview", "Show the branches to delete.")
+
+	cleanup = app.Command("cleanup", "Delete the remote branches.")
 )
 
 func setupLogger() {
@@ -52,7 +58,6 @@ func remoteBranches(s storer.ReferenceStorer) (storer.ReferenceIter, error) {
 
 func main() {
 	kingpin.Version("0.0.1")
-	kingpin.Parse()
 
 	setupLogger()
 
@@ -121,26 +126,33 @@ func main() {
 		log.Infof("Remote Branch %s head is: %s", branchName, branchHead)
 	}
 
-	mergedBranches := make([]string, 0)
+	switch kingpin.MustParse(app.Parse(os.Args[1:])) {
+	case preview.FullCommand():
 
-	err = masterCommits.ForEach(func(commit *object.Commit) error {
-		for branchName, branchHead := range remoteBranchHeads {
-			if (branchHead.String() == commit.Hash.String()) && (branchName != "origin/master") {
-				log.Infof("Branch %s head (%s) was found in master, so has been merged!\n", branchName, branchHead)
-				mergedBranches = append(mergedBranches, branchName)
+		mergedBranches := make([]string, 0)
+
+		err = masterCommits.ForEach(func(commit *object.Commit) error {
+			for branchName, branchHead := range remoteBranchHeads {
+				if (branchHead.String() == commit.Hash.String()) && (branchName != "origin/master") {
+					log.Infof("Branch %s head (%s) was found in master, so has been merged!\n", branchName, branchHead)
+					mergedBranches = append(mergedBranches, branchName)
+				}
+			}
+			return nil
+		})
+
+		if len(mergedBranches) == 0 {
+			fmt.Println("No branches already merged into master!")
+		} else {
+			sort.Strings(mergedBranches)
+			fmt.Println("\nThese branches have been merged into master:")
+			for _, branchName := range mergedBranches {
+				fmt.Printf("  %s\n", branchName)
 			}
 		}
-		return nil
-	})
-
-	if len(mergedBranches) == 0 {
-		fmt.Println("No branches already merged into master!")
-	} else {
-		sort.Strings(mergedBranches)
-		fmt.Println("\nThese branches have been merged into master:")
-		for _, branchName := range mergedBranches {
-			fmt.Printf("  %s\n", branchName)
-		}
+	case cleanup.FullCommand():
+		fmt.Println("Cleanup has not been implemented yet!")
+		os.Exit(1)
 	}
 
 }

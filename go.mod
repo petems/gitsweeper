@@ -22,5 +22,5 @@ require (
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/src-d/go-billy.v4 v4.3.0 // indirect
 	gopkg.in/src-d/go-git-fixtures.v3 v3.3.0 // indirect
-	gopkg.in/src-d/go-git.v4 v4.10.0 // indirect
+	gopkg.in/src-d/go-git.v4 v4.10.0
 )
