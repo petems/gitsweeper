@@ -1,10 +1,11 @@
 require 'aruba/cucumber'
+require 'docker'
 require 'fileutils'
 require 'forwardable'
 require 'tmpdir'
 
 bin_dir = File.expand_path('../fakebin', __FILE__)
-system_git = `which git 2>/dev/null`.chomp
+aruba_dir = File.expand_path('../../..', __FILE__) + '/tmp/aruba'
 
 Before do
   # increase process exit timeout from the default of 3 seconds
@@ -14,8 +15,12 @@ Before do
 end
 
 After do
-  @server.stop if defined? @server and @server
-  FileUtils.rm_f("#{bin_dir}/vim")
+  begin
+    app = Docker::Container.get("gitdocker")
+    app.delete(force: true)
+  rescue Docker::Error::NotFoundError
+  end
+  FileUtils.rm_rf("#{aruba_dir}/bare-git-repo")
 end
 
 RSpec::Matchers.define :be_successful_command do
@@ -66,54 +71,12 @@ World Module.new {
     super.tap { sleep 0.1 }
   end
 
-  def history
-    histfile = File.join(ENV['HOME'], '.history')
-    if File.exist? histfile
-      File.readlines histfile
-    else
-      []
-    end
-  end
-
-  def assert_command_run cmd
-    cmd += "\n" unless cmd[-1..-1] == "\n"
-    expect(history).to include(cmd)
-  end
-
-  def edit_hub_config
-    config = File.join(ENV['HOME'], '.config/hub')
-    FileUtils.mkdir_p File.dirname(config)
-    if File.exist? config
-      data = YAML.load File.read(config)
-    else
-      data = {}
-    end
-    yield data
-    File.open(config, 'w') { |cfg| cfg << YAML.dump(data) }
-  end
-
-  define_method(:text_editor_script) do |bash_code|
-    File.open("#{bin_dir}/vim", 'w', 0755) { |exe|
-      exe.puts "#!/bin/bash"
-      exe.puts "set -e"
-      exe.puts bash_code
-    }
-  end
-
   def run_silent cmd
     in_current_dir do
       command = SimpleCommand.run(cmd)
       expect(command).to be_successful_command
       command.output
     end
-  end
-
-  def empty_commit(message = nil)
-    unless message
-      @empty_commit_count = defined?(@empty_commit_count) ? @empty_commit_count + 1 : 1
-      message = "empty #{@empty_commit_count}"
-    end
-    run_silent "git commit --quiet -m '#{message}' --allow-empty"
   end
 
   # Aruba unnecessarily creates new Announcer instance on each invocation

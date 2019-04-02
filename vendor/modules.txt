@@ -1,3 +1,7 @@
+# code.gitea.io/git v0.0.0-20190326165521-21aca48d1af3
+code.gitea.io/git
+# github.com/Unknwon/com v0.0.0-20190321035513-0fed4efef755
+github.com/Unknwon/com
 # github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc
 github.com/alecthomas/template
 github.com/alecthomas/template/parse
@@ -20,6 +24,8 @@ github.com/konsorten/go-windows-terminal-sequences
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.5
 github.com/mattn/go-isatty
+# github.com/mcuadros/go-version v0.0.0-20190308113854-92cdf37c5b75
+github.com/mcuadros/go-version
 # github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b
 github.com/mgutz/ansi
 # github.com/mitchellh/go-homedir v1.0.0

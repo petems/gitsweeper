@@ -20,4 +20,5 @@
 gitsweeper*
 
 bin/*
+tmp/*
 # End of https://www.gitignore.io/api/go,visualstudiocode
