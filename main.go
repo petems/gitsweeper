@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -87,17 +89,35 @@ func main() {
 		if len(mergedBranches) == 0 {
 			fmt.Println("No remote branches are available for cleaning up")
 		} else {
-			for _, branchName := range mergedBranches {
-				remote, branchShort := parseBranchname(branchName)
-				fmt.Printf("deleting %s", branchShort)
-				repo, _ := getCurrentDirAsGitRepo()
-				err := deleteBranch(repo, remote, branchShort)
-				if err != nil {
-					fatalError("\nCould not delete branch", err)
-				} else {
-					fmt.Printf(" - (done)\n")
+
+			if len(mergedBranches) == 0 {
+				fmt.Println("No branches already merged into master!")
+			} else {
+				fmt.Println("\nThese branches have been merged into master:")
+				for _, branchName := range mergedBranches {
+					fmt.Printf("  %s\n", branchName)
+				}
+				if !*(cleanupForce) {
+					confirmDeleteBranches := askForConfirmation("Delete these branches?", os.Stdin)
+					if !confirmDeleteBranches {
+						fmt.Printf("OK, aborting.\n")
+						os.Exit(0)
+					}
+				}
+				fmt.Printf("\n")
+				for _, branchName := range mergedBranches {
+					remote, branchShort := parseBranchname(branchName)
+					fmt.Printf("  deleting %s", branchShort)
+					repo, _ := getCurrentDirAsGitRepo()
+					err := deleteBranch(repo, remote, branchShort)
+					if err != nil {
+						fatalError("\nCould not delete branch", err)
+					} else {
+						fmt.Printf(" - (done)\n")
+					}
 				}
 			}
+
 		}
 	case version.FullCommand():
 		setupLogger(*debug)
@@ -195,6 +215,31 @@ func getCurrentDirAsGitRepo() (*git.Repository, error) {
 	}
 
 	return repo, nil
+}
+
+// askForConfirmation asks the user for confirmation. A user must type in "yes" or "no" and
+// then press enter. It has fuzzy matching, so "y", "Y", "yes", "YES", and "Yes" all count as
+// confirmations. If the input is not recognized, it will ask again. The function does not return
+// until it gets a valid response from the user.
+func askForConfirmation(s string, in io.Reader) bool {
+	reader := bufio.NewReader(in)
+
+	for {
+		fmt.Printf("%s [y/n]: ", s)
+
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		response = strings.ToLower(strings.TrimSpace(response))
+
+		if response == "y" || response == "yes" {
+			return true
+		} else if response == "n" || response == "no" {
+			return false
+		}
+	}
 }
 
 func getMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]string, error) {
