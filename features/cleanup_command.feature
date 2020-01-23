@@ -7,18 +7,54 @@ Feature: Cleanup Command
     When I run `go build -o ../../bin/gitsweeper-int-test ../../main.go`
     Then the exit status should be 0
 
-  Scenario: In a git repo with branches
+  Scenario: In a git repo with branches with force
     Given no old "gitdocker" containers exist
     And I have a dummy git server running called "gitdocker" running on port "8008"
     And I clone "http://localhost:8008/dummy-repo.git" repo
     And I cd to "dummy-repo"
-    When I run `bin/gitsweeper-int-test cleanup`
+    When I run `bin/gitsweeper-int-test cleanup --force`
     Then the output should contain:
       """
+      These branches have been merged into master:
+        origin/duplicate-branch-1
+        origin/duplicate-branch-2
+      
+        deleting duplicate-branch-1 - (done)
+        deleting duplicate-branch-2 - (done)
+      """
+    And the exit status should be 0
 
-      Fetching from the remote...
-      deleting duplicate-branch-1 - (done)
-      deleting duplicate-branch-2 - (done)
+  Scenario: In a git repo with branches with prompt yes
+    Given no old "gitdocker" containers exist
+    And I have a dummy git server running called "gitdocker" running on port "8008"
+    And I clone "http://localhost:8008/dummy-repo.git" repo
+    And I cd to "dummy-repo"
+    When I run `bin/gitsweeper-int-test cleanup` interactively
+    And I type "y"
+    Then the output should contain:
+      """
+      These branches have been merged into master:
+        origin/duplicate-branch-1
+        origin/duplicate-branch-2
+      Delete these branches? [y/n]: 
+        deleting duplicate-branch-1 - (done)
+        deleting duplicate-branch-2 - (done)
+      """
+    And the exit status should be 0
+  
+  Scenario: In a git repo with branches with prompt no
+    Given no old "gitdocker" containers exist
+    And I have a dummy git server running called "gitdocker" running on port "8008"
+    And I clone "http://localhost:8008/dummy-repo.git" repo
+    And I cd to "dummy-repo"
+    When I run `bin/gitsweeper-int-test cleanup` interactively
+    And I type "n"
+    Then the output should contain:
+      """
+      These branches have been merged into master:
+        origin/duplicate-branch-1
+        origin/duplicate-branch-2
+      Delete these branches? [y/n]: OK, aborting.
       """
     And the exit status should be 0
 
