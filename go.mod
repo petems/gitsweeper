@@ -17,3 +17,5 @@ require (
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/src-d/go-git.v4 v4.10.0
 )
+
+replace github.com/Unknwon/com v0.0.0 => github.com/unknwon/com v0.0.0
