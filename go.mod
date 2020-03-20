@@ -13,6 +13,7 @@ require (
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0 // indirect
 	github.com/sirupsen/logrus v1.4.0
+	github.com/stretchr/testify v1.2.2
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/src-d/go-git.v4 v4.10.0

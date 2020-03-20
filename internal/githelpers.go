@@ -29,7 +29,7 @@ func RemoteBranches(s storer.ReferenceStorer) (storer.ReferenceIter, error) {
 }
 
 func ParseBranchname(branchString string) (remote, branchname string) {
-	branchArray := strings.Split(branchString, "/")
+	branchArray := strings.SplitN(branchString, "/", 2)
 	remote = branchArray[0]
 	branchname = branchArray[1]
 	return
