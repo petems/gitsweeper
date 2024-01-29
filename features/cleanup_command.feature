@@ -80,3 +80,10 @@ Feature: Cleanup Command
       gitsweeper-int-test: error: Error when looking for branches repository does not exist
       """
     And the exit status should be 1
+  
+  Scenario: Using a non-existant remote
+    Given I clone "git://github.com/petems/example-repo-with-remote-branches.git" repo
+    And I cd to "example-repo-with-remote-branches"
+    When I run `bin/gitsweeper-int-test cleanup --origin=notexist`
+    Then the output should match /Could not find the remote named notexist/
+    And the exit status should be 1
