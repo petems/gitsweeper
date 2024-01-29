@@ -24,6 +24,18 @@ Feature: Cleanup Command
       """
     And the exit status should be 0
 
+  Scenario: In a git repo with a origin new_origin
+    Given no old "gitdocker" containers exist
+    And I have a dummy git server running called "gitdocker" running on port "8008"
+    And I clone "http://localhost:8008/dummy-repo.git" repo
+    And I cd to "dummy-repo"
+    When I run `git remote -v`
+    Then the output should contain:
+      """
+      FOO
+      """
+    And the exit status should be 0
+
   Scenario: In a git repo with branches with prompt yes
     Given no old "gitdocker" containers exist
     And I have a dummy git server running called "gitdocker" running on port "8008"

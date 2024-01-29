@@ -1,5 +1,6 @@
 source 'https://rubygems.org'
-gem 'aruba', '~> 0.14.9'
+gem 'aruba'
 gem 'docker-api', require: 'docker'
 gem 'pry'
 gem 'pry-coolline'
+gem 'ffi', '1.16.3'
