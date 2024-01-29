@@ -5,25 +5,30 @@ Feature: Preview Command
     And a build of gitsweeper
 
   Scenario: In a Git repo with branches
-    Given I clone "https://github.com/petems/example-repo-with-remote-branches.git" repo
-    And I cd to "example-repo-with-remote-branches"
+    Given no old "gitdocker" containers exist
+    And I have a dummy git server running called "gitdocker" running on port "8008"
+    And I clone "http://localhost:8008/dummy-repo.git" repo
+    And I cd to "dummy-repo"
     When I run `gitsweeper-int-test preview`
     Then the output should contain:
       """
       Fetching from the remote...
 
       These branches have been merged into master:
-        origin/branch_thats_been_merged_to_master
+        origin/duplicate-branch-1
+        origin/duplicate-branch-2
 
       To delete them, run again with `gitsweeper cleanup`
       """
     And the exit status should be 0
 
   Scenario: In a Git repo with branches and debug enabled
-    Given I clone "https://github.com/petems/example-repo-with-remote-branches.git" repo
-    And I cd to "example-repo-with-remote-branches"
+    Given no old "gitdocker" containers exist
+    And I have a dummy git server running called "gitdocker" running on port "8008"
+    And I clone "http://localhost:8008/dummy-repo.git" repo
+    And I cd to "dummy-repo"
     When I run `gitsweeper-int-test --debug preview`
-    Then the output should contain "Branch origin/branch_thats_been_merged_to_master head (574d05288ddb0449402829e90b5752d78a7f54d7) was found in master, so has been merged!"
+    Then the output should contain "Branch origin/duplicate-branch-1 head (605999f514798915490a1887aa255ea56393de07) was found in master, so has been merged!"
     And the exit status should be 0
 
   Scenario: In a non-git repo
@@ -41,8 +46,10 @@ Feature: Preview Command
     And the exit status should be 1
 
   Scenario: Using a non-existant remote
-    Given I clone "https://github.com/petems/example-repo-with-remote-branches.git" repo
-    And I cd to "example-repo-with-remote-branches"
+    Given no old "gitdocker" containers exist
+    And I have a dummy git server running called "gitdocker" running on port "8008"
+    And I clone "http://localhost:8008/dummy-repo.git" repo
+    And I cd to "dummy-repo"
     When I run `gitsweeper-int-test preview --origin=notexist`
     Then the output should match /Could not find the remote named notexist/
     And the exit status should be 1
