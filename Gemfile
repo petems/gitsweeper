@@ -1,5 +1,5 @@
 source 'https://rubygems.org'
-gem 'aruba'
+gem 'aruba', github: 'cucumber/aruba', ref: 'b9d0f15d1292697b051f94984925b4f63c4efac4'
 gem 'docker-api', require: 'docker'
 gem 'pry'
 gem 'pry-coolline'

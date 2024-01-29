@@ -5,8 +5,14 @@ Given(/^I have "([^"]*)" command installed$/) do |command|
   raise "Command #{command} is not present in the system" if not is_present
 end
 
-Given("a build of gitsweeper") do
+Then('the build should be present') do
+  steps %Q(
+    Then a file named "#{$bin_dir}/gitsweeper-int-test" should exist
+  )
+end
 
+Given("a build of gitsweeper") do
+  raise 'gitsweeper build failed' unless system("go build -o bin/gitsweeper-int-test main.go")
 end
 
 Given(/nothings running on port "(\w+)"/) do |port|
@@ -31,9 +37,13 @@ Given /^I have a dummy git server running called "(\w+)" running on port "(\w+)"
 end
 
 Given(/I clone "([^"]*)" repo/) do |repo_name|
-  run_silent %(git clone #{repo_name})
+  steps %Q(
+    When I successfully run `git clone #{repo_name}`
+  )
 end
 
 Given(/I create a bare git repo called "([^"]*)"/) do |repo_name|
-  run_silent %(git init --bare #{repo_name})
+  steps %Q(
+    When I successfully run `git init --bare #{repo_name}`
+  )
 end

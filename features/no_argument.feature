@@ -2,12 +2,12 @@ Feature: Version Command
 
   Background:
     Given I have "go" command installed
-    When I run `go build -o ../../bin/gitsweeper-int-test ../../main.go`
-    Then the exit status should be 0
+    And a build of gitsweeper
+    Then the build should be present
 
   Scenario:
     Given a build of gitsweeper
-    When I run `bin/gitsweeper-int-test`
+    When I run `gitsweeper-int-test`
     Then the output should contain:
       """"
       usage: gitsweeper [<flags>] <command> [<args> ...]
