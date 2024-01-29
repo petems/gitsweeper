@@ -94,7 +94,7 @@ func main() {
 			fmt.Printf("\n")
 			for _, branchName := range mergedBranches {
 				remote, branchShort := hlpr.ParseBranchname(branchName)
-				fmt.Printf("  deleting %s", branchShort)
+				fmt.Printf("  deleting %s", branchName)
 				repo, _ := hlpr.GetCurrentDirAsGitRepo()
 				err := hlpr.DeleteBranch(repo, remote, branchShort)
 				if err != nil {

@@ -53,3 +53,22 @@ Feature: Preview Command
     When I run `gitsweeper-int-test preview --origin=notexist`
     Then the output should match /Could not find the remote named notexist/
     And the exit status should be 1
+
+  Scenario: Specifying a remote with multiple remotes
+    Given no old "gitdocker" containers exist
+    And I have a dummy git server running called "gitdocker" running on port "8008"
+    And I clone "http://localhost:8008/dummy-repo.git" repo
+    And I cd to "dummy-repo"
+    And I add a new remote "new_remote" with url "http://localhost:8008/dummy-repo.git"
+    When I run `gitsweeper-int-test preview --origin=new_remote`
+    Then the output should contain:
+      """
+      Fetching from the remote...
+
+      These branches have been merged into master:
+        new_remote/duplicate-branch-1
+        new_remote/duplicate-branch-2
+
+      To delete them, run again with `gitsweeper cleanup`
+      """
+    And the exit status should be 0

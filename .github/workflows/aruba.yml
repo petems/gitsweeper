@@ -14,6 +14,7 @@ jobs:
       matrix:
         # ruby-version: ['3.0', '3.1', '3.2'] # overkill
         ruby-version: ['3.3']
+        go-version: [ '1.21.x' ]
     steps:
     - uses: actions/checkout@v2
     - name: Set up Ruby
@@ -24,5 +25,7 @@ jobs:
       run: docker pull petems/dummy-git-repo
     - name: Bundler
       run: bundle install
+    - name: Setup Go ${{ matrix.go-version }}
+      uses: actions/setup-go@v4
     - name: Cucumber
       run: bundle exec cucumber
