@@ -1,0 +1,57 @@
+run:
+  timeout: 30s
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  # fix: true
+  include:
+    - EXC0012
+    - EXC0014
+
+linters-settings:
+  errcheck:
+    exclude-functions:
+      - (*github.com/benthosdev/benthos/v4/internal/batch.Error).Failed
+      - (*github.com/benthosdev/benthos/v4/public/service.BatchError).Failed
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - hugeParam # Micro-optimisations
+      - rangeValCopy # Micro-optimisations
+      - ifElseChain # Mostly false positives
+      - ptrToRefParam # False positives?
+      - importShadow # Probably not worth the hassle...
+
+linters:
+  disable-all: true
+  enable:
+    # Default linters reported by `golangci-lint help linters` in v1.52.0
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    # Another linter bites the dust, for some reason this is false erroring on github actions
+    - typecheck
+    - unused
+    # Extra linters:
+    - wastedassign
+    - stylecheck
+    - gofmt
+    - goimports
+    # gocritic is very slow (golangci-lint v1.52.0)
+    # - gocritic
+    # - revive
+    - unconvert
+    - durationcheck
+    # - depguard
+    # - bodyclose
+    # - gosec
+    # - misspell
+    # - prealloc
