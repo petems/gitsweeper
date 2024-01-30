@@ -156,11 +156,19 @@ func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]s
 
 	delete(remoteBranchHeads, masterBranchRemote)
 
+	log.Infof("Origin has been set to '%s', restricting branches to preview to that origin", remoteOrigin)
+
 	err = masterCommits.ForEach(func(commit *object.Commit) error {
 		for branchName, branchHead := range remoteBranchHeads {
-			if branchHead.String() == commit.Hash.String() {
-				log.Infof("Branch %s head (%s) was found in master, so has been merged!\n", branchName, branchHead)
-				mergedBranches = append(mergedBranches, branchName)
+			remote, _ := ParseBranchname(branchName)
+			if remote == remoteOrigin {
+				log.Infof("Branch '%s' matches remote '%s'", branchName, remoteOrigin)
+				if branchHead.String() == commit.Hash.String() {
+					log.Infof("Branch %s head (%s) was found in master, so has been merged!\n", branchName, branchHead)
+					mergedBranches = append(mergedBranches, branchName)
+				}
+			} else {
+				log.Infof("Branch '%s' does not match remote '%s', not adding to", branchName, remoteOrigin)
 			}
 		}
 		return nil

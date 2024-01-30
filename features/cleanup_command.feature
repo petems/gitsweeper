@@ -18,8 +18,8 @@ Feature: Cleanup Command
         origin/duplicate-branch-1
         origin/duplicate-branch-2
       
-        deleting duplicate-branch-1 - (done)
-        deleting duplicate-branch-2 - (done)
+        deleting origin/duplicate-branch-1 - (done)
+        deleting origin/duplicate-branch-2 - (done)
       """
     And the exit status should be 0
 
@@ -36,8 +36,8 @@ Feature: Cleanup Command
         origin/duplicate-branch-1
         origin/duplicate-branch-2
       Delete these branches? [y/n]: 
-        deleting duplicate-branch-1 - (done)
-        deleting duplicate-branch-2 - (done)
+        deleting origin/duplicate-branch-1 - (done)
+        deleting origin/duplicate-branch-2 - (done)
       """
     And the exit status should be 0
   
@@ -66,3 +66,23 @@ Feature: Cleanup Command
       gitsweeper-int-test: error: Error when looking for branches repository does not exist
       """
     And the exit status should be 1
+
+  Scenario: Specifying a remote with multiple remotes
+    Given no old "gitdocker" containers exist
+    And I have a dummy git server running called "gitdocker" running on port "8008"
+    And I clone "http://localhost:8008/dummy-repo.git" repo
+    And I cd to "dummy-repo"
+    And I add a new remote "new_remote" with url "http://localhost:8008/dummy-repo.git"
+    When I run `gitsweeper-int-test cleanup --origin=new_remote --force`
+    Then the output should contain:
+      """
+      Fetching from the remote...
+
+      These branches have been merged into master:
+        new_remote/duplicate-branch-1
+        new_remote/duplicate-branch-2
+
+        deleting new_remote/duplicate-branch-1 - (done)
+        deleting new_remote/duplicate-branch-2 - (done)
+      """
+    And the exit status should be 0

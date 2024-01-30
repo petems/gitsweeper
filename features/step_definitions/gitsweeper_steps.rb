@@ -47,3 +47,10 @@ Given(/I create a bare git repo called "([^"]*)"/) do |repo_name|
     When I successfully run `git init --bare #{repo_name}`
   )
 end
+
+Given /^I add a new remote "([^"]*)" with url "([^"]*)"$/ do |new_remote, url|
+  steps %Q(
+    When I successfully run `git remote add #{new_remote} #{url}`
+    And I successfully run `git fetch #{new_remote}`
+  )
+end
