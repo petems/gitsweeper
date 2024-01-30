@@ -85,4 +85,44 @@ Feature: Cleanup Command
         deleting new_remote/duplicate-branch-1 - (done)
         deleting new_remote/duplicate-branch-2 - (done)
       """
+  
+  Scenario: Specifying a single skip string with debug
+    Given no old "gitdocker" containers exist
+    And I have a dummy git server running called "gitdocker" running on port "8008"
+    And I clone "http://localhost:8008/dummy-repo.git" repo
+    And I cd to "dummy-repo"
+    When I run `gitsweeper-int-test cleanup --force --skip=duplicate-branch-1 --debug`
+    Then the output should contain:
+      """
+      Branch 'origin/duplicate-branch-1' matches skip branch string '[duplicate-branch-1]'
+      """
     And the exit status should be 0
+
+  Scenario: Specifying skipping all branches gives specific error message
+    Given no old "gitdocker" containers exist
+    And I have a dummy git server running called "gitdocker" running on port "8008"
+    And I clone "http://localhost:8008/dummy-repo.git" repo
+    And I cd to "dummy-repo"
+    When I run `gitsweeper-int-test cleanup --force --skip=duplicate-branch-1,duplicate-branch-2`
+    Then the output should match /No remote branches are available for cleaning up/
+    And the exit status should be 0
+  
+  Scenario: Specifying a non-existant single skip string with debug
+    Given no old "gitdocker" containers exist
+    And I have a dummy git server running called "gitdocker" running on port "8008"
+    And I clone "http://localhost:8008/dummy-repo.git" repo
+    And I cd to "dummy-repo"
+    When I run `gitsweeper-int-test cleanup --force --skip=skipfakebranch --debug`
+    Then the output should contain:
+      """
+      Fetching from the remote...
+
+      These branches have been merged into master:
+        origin/duplicate-branch-1
+        origin/duplicate-branch-2
+
+        deleting origin/duplicate-branch-1 - (done)
+        deleting origin/duplicate-branch-2 - (done)
+      """
+    And the exit status should be 0
+

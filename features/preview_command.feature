@@ -72,3 +72,59 @@ Feature: Preview Command
       To delete them, run again with `gitsweeper cleanup`
       """
     And the exit status should be 0
+    
+  Scenario: Specifying a single skip instance string
+    Given no old "gitdocker" containers exist
+    And I have a dummy git server running called "gitdocker" running on port "8008"
+    And I clone "http://localhost:8008/dummy-repo.git" repo
+    And I cd to "dummy-repo"
+    When I run `gitsweeper-int-test preview --skip=duplicate-branch-1`
+    Then the output should contain:
+      """
+      Fetching from the remote...
+
+      These branches have been merged into master:
+        origin/duplicate-branch-2
+
+      To delete them, run again with `gitsweeper cleanup`
+      """
+    And the exit status should be 0
+
+  Scenario: Specifying a single skip string with debug
+    Given no old "gitdocker" containers exist
+    And I have a dummy git server running called "gitdocker" running on port "8008"
+    And I clone "http://localhost:8008/dummy-repo.git" repo
+    And I cd to "dummy-repo"
+    When I run `gitsweeper-int-test preview --skip=duplicate-branch-1 --debug`
+    Then the output should contain:
+      """
+      Branch 'origin/duplicate-branch-1' matches skip branch string '[duplicate-branch-1]'
+      """
+    And the exit status should be 0
+
+  Scenario: Specifying skipping all branches gives specific message that nothing will happen
+    Given no old "gitdocker" containers exist
+    And I have a dummy git server running called "gitdocker" running on port "8008"
+    And I clone "http://localhost:8008/dummy-repo.git" repo
+    And I cd to "dummy-repo"
+    When I run `gitsweeper-int-test preview --skip=duplicate-branch-1,duplicate-branch-2 --debug`
+    Then the output should match /No remote branches are available for cleaning up/
+    And the exit status should be 0
+  
+  Scenario: Specifying a non-existant single skip string with debug
+    Given no old "gitdocker" containers exist
+    And I have a dummy git server running called "gitdocker" running on port "8008"
+    And I clone "http://localhost:8008/dummy-repo.git" repo
+    And I cd to "dummy-repo"
+    When I run `gitsweeper-int-test preview --skip=skipfakebranch --debug`
+    Then the output should contain:
+      """
+      Fetching from the remote...
+
+      These branches have been merged into master:
+        origin/duplicate-branch-1
+        origin/duplicate-branch-2
+
+      To delete them, run again with `gitsweeper cleanup`
+      """
+    And the exit status should be 0
