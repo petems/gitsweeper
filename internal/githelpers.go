@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 
@@ -82,6 +83,8 @@ func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]s
 		return nil, err
 	}
 
+	skipSlice := strings.Split(skipBranches, ",")
+
 	log.Info("Attempting to get master information from branches from repo")
 
 	branchRefs, err := repo.Branches()
@@ -137,7 +140,12 @@ func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]s
 	err = remoteBranches.ForEach(func(branch *plumbing.Reference) error {
 		remoteBranchName := strings.TrimPrefix(branch.Name().String(), "refs/remotes/")
 		remoteBranchHead := branch.Hash()
-		remoteBranchHeads[remoteBranchName] = remoteBranchHead
+		_, shortBranchName := ParseBranchname(remoteBranchName)
+		if slices.Contains(skipSlice, shortBranchName) {
+			log.Infof("Branch '%s' matches skip branch string '%s'", remoteBranchName, skipSlice)
+		} else {
+			remoteBranchHeads[remoteBranchName] = remoteBranchHead
+		}
 		return nil
 	})
 

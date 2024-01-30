@@ -27,5 +27,7 @@ jobs:
       run: bundle install
     - name: Setup Go ${{ matrix.go-version }}
       uses: actions/setup-go@v4
+      with:
+          go-version: ${{ matrix.go-version }}
     - name: Cucumber
       run: bundle exec cucumber
