@@ -6,7 +6,7 @@ require (
 	code.gitea.io/git v0.0.0-20190326165521-21aca48d1af3
 	github.com/go-git/go-git/v5 v5.11.0
 	github.com/sirupsen/logrus v1.9.3
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 )
