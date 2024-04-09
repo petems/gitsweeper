@@ -29,7 +29,7 @@ These branches have been merged into master:
 ## Installation
 
 ```bash
-go get -v github.com/petems/gitsweeper
+go install github.com/petems/gitsweeper@latest
 ```
 
 Eventually I'll configure Travis to build binaries and setup a `brew tap` for OSX and Linux.
