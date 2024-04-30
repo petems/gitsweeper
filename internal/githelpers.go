@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -8,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	gitshell "code.gitea.io/git"
+	gitshell "code.gitea.io/gitea/modules/git"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -40,7 +41,16 @@ func DeleteBranch(repo *git.Repository, remote, branchShortName string) error {
 
 	deleteBranchShortName := fmt.Sprintf(":%s", branchShortName)
 
-	err := gitshell.Push(".", gitshell.PushOptions{Remote: remote, Branch: deleteBranchShortName})
+	ctx := context.Background()
+
+	err := gitshell.Push(ctx, ".", gitshell.PushOptions{
+		Remote:  remote,
+		Branch:  deleteBranchShortName,
+		Force:   false,
+		Mirror:  false,
+		Env:     []string{},
+		Timeout: 0,
+	})
 
 	return err
 }
