@@ -3,7 +3,6 @@ module github.com/petems/gitsweeper
 go 1.21
 
 require (
-	code.gitea.io/git v0.0.0-20190326165521-21aca48d1af3
 	github.com/go-git/go-git/v5 v5.11.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
@@ -15,7 +14,6 @@ require (
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20230828082145-3c4c8a2d2371 // indirect
-	github.com/Unknwon/com v0.0.0-20190321035513-0fed4efef755 // indirect
 	github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc // indirect
 	github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf // indirect
 	github.com/cloudflare/circl v1.3.7 // indirect
@@ -30,15 +28,12 @@ require (
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.1 // indirect
 	github.com/mattn/go-isatty v0.0.5 // indirect
-	github.com/mcuadros/go-version v0.0.0-20190308113854-92cdf37c5b75 // indirect
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
-	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/skeema/knownhosts v1.2.1 // indirect
-	github.com/src-d/gcfg v1.4.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	golang.org/x/crypto v0.21.0 // indirect
 	golang.org/x/mod v0.12.0 // indirect
@@ -47,8 +42,6 @@ require (
 	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/tools v0.13.0 // indirect
 	gopkg.in/fsnotify.v1 v1.4.7 // indirect
-	gopkg.in/src-d/go-billy.v4 v4.3.2 // indirect
-	gopkg.in/src-d/go-git.v4 v4.13.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
