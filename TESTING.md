@@ -37,6 +37,37 @@ make acceptance-test
 go test -v -run TestVersionCommand
 ```
 
+## Coverage Reports
+
+### Acceptance Test Coverage
+```bash
+# Run acceptance tests with coverage
+make acceptance-cover
+
+# Generate HTML coverage report for acceptance tests
+make acceptance-cover-html
+
+# Show function-level coverage for acceptance tests
+make acceptance-cover-func
+```
+
+### Combined Coverage
+```bash
+# Run all tests with combined coverage report
+make all-cover
+
+# Generate HTML coverage report for all tests
+make all-cover-html
+```
+
+### Coverage Cleanup
+```bash
+# Clean up all coverage files
+make clean-coverage
+```
+
+**Note**: Acceptance tests typically show 0% code coverage because they test the application as a black box by executing the compiled binary. This is expected behavior and indicates proper separation between unit tests (which test internal functions) and acceptance tests (which test end-to-end functionality).
+
 ## Test Dependencies
 
 ### Required for Acceptance Tests
