@@ -67,7 +67,7 @@ func (h *TestHelper) RunCommandInDir(dir string, args ...string) *CommandResult 
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
-	
+
 	result := &CommandResult{
 		Stdout:   stdout.String(),
 		Stderr:   stderr.String(),
@@ -108,11 +108,11 @@ func (h *TestHelper) RunCommandInteractiveInDir(dir, input string, args ...strin
 	// Send input
 	go func() {
 		defer stdin.Close()
-		io.WriteString(stdin, input+"\n")
+		_, _ = io.WriteString(stdin, input+"\n")
 	}()
 
 	err = cmd.Wait()
-	
+
 	result := &CommandResult{
 		Stdout:   stdout.String(),
 		Stderr:   stderr.String(),
@@ -172,7 +172,7 @@ func (h *TestHelper) CloneRepo(repoURL string) string {
 	// Extract repo name from URL
 	parts := strings.Split(repoURL, "/")
 	repoName := strings.TrimSuffix(parts[len(parts)-1], ".git")
-	
+
 	return filepath.Join(h.workDir, repoName)
 }
 
@@ -182,7 +182,7 @@ func (h *TestHelper) CreateBareRepo(repoName string) string {
 	cmd := exec.Command("git", "init", "--bare", repoPath)
 	err := cmd.Run()
 	require.NoError(h.t, err, "Failed to create bare repository")
-	
+
 	return repoPath
 }
 
@@ -278,9 +278,9 @@ func TestCleanupCommand(t *testing.T) {
 
 	t.Run("In a non-git repo", func(t *testing.T) {
 		nonGitDir := helper.CreateDirectory("not-a-git-repo")
-		
+
 		result := helper.RunCommandInDir(nonGitDir, "cleanup")
-		
+
 		assert.Equal(t, 1, result.ExitCode)
 		// The error message should indicate repository does not exist
 		output := result.Stdout + result.Stderr
@@ -289,15 +289,14 @@ func TestCleanupCommand(t *testing.T) {
 
 	t.Run("In a git repo with no remotes", func(t *testing.T) {
 		repoDir := helper.CreateTestGitRepo("test-repo")
-		
+
 		result := helper.RunCommandInDir(repoDir, "cleanup", "--force")
-		
+
 		// The application will fail if there are no remotes
 		assert.Equal(t, 1, result.ExitCode)
 		output := result.Stdout + result.Stderr
 		assert.Contains(t, output, "Error when looking for branches")
 	})
-
 
 }
 
@@ -311,9 +310,9 @@ func TestPreviewCommand(t *testing.T) {
 
 	t.Run("Preview in non-git repo", func(t *testing.T) {
 		nonGitDir := helper.CreateDirectory("not-a-git-repo")
-		
+
 		result := helper.RunCommandInDir(nonGitDir, "preview")
-		
+
 		assert.Equal(t, 1, result.ExitCode)
 		output := result.Stdout + result.Stderr
 		assert.Contains(t, output, "This is not a Git repository")
@@ -321,9 +320,9 @@ func TestPreviewCommand(t *testing.T) {
 
 	t.Run("Preview in git repo with no remotes", func(t *testing.T) {
 		repoDir := helper.CreateTestGitRepo("test-repo")
-		
+
 		result := helper.RunCommandInDir(repoDir, "preview")
-		
+
 		assert.Equal(t, 1, result.ExitCode)
 		output := result.Stdout + result.Stderr
 		assert.Contains(t, output, "Error when looking for branches")
@@ -331,9 +330,9 @@ func TestPreviewCommand(t *testing.T) {
 
 	t.Run("Preview with custom master branch", func(t *testing.T) {
 		repoDir := helper.CreateTestGitRepo("test-repo")
-		
+
 		result := helper.RunCommandInDir(repoDir, "preview", "--master=main")
-		
+
 		// This will fail because there are no remotes
 		assert.Equal(t, 1, result.ExitCode)
 		output := result.Stdout + result.Stderr
