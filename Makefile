@@ -44,6 +44,14 @@ test: ## Runs the go tests
 	@echo "+ $@"
 	@go test ./...
 
+.PHONY: acceptance-test
+acceptance-test: ## Runs the acceptance tests
+	@echo "+ $@"
+	@go test -v -run "Test.*Command" .
+
+.PHONY: test-all
+test-all: test acceptance-test ## Runs all tests (unit and acceptance)
+
 .PHONY: install
 install: ## Installs the executable or package
 	@echo "+ $@"

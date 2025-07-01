@@ -1,1 +1,0 @@
-default: --color --format pretty --publish-quiet

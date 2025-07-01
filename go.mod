@@ -1,6 +1,8 @@
 module github.com/petems/gitsweeper
 
-go 1.21
+go 1.23.0
+
+toolchain go1.24.2
 
 require (
 	code.gitea.io/git v0.0.0-20190326165521-21aca48d1af3

@@ -55,3 +55,29 @@ To delete them, run again with `git-sweep cleanup`
 ```
 
 but has a few changes that are tweaked toward my requirements.
+
+## Development
+
+### Testing
+
+This project uses native Go testing for both unit and acceptance tests. The testing approach was migrated from Ruby/Aruba to native Go for better maintainability and fewer dependencies.
+
+#### Running Tests
+
+```bash
+# Run all tests
+make test-all
+
+# Run only unit tests
+make test
+
+# Run only acceptance tests
+make acceptance-test
+```
+
+#### Test Structure
+
+- **Unit tests**: Located in `internal/githelpers_test.go` - test individual functions
+- **Acceptance tests**: Located in `acceptance_test.go` - test complete application behavior end-to-end
+
+For more detailed testing information, see [TESTING.md](TESTING.md).
