@@ -85,10 +85,45 @@ all-cover-html: all-cover ## Generates HTML coverage report for all tests
 	@go tool cover -html=all-coverage.out -o all-coverage.html
 	@echo "Combined coverage report generated: all-coverage.html"
 
+.PHONY: integration-cover
+integration-cover: ## Runs acceptance tests with integration coverage (Go 1.20+)
+	@echo "+ $@"
+	@rm -rf covdatafiles
+	@mkdir -p covdatafiles
+	@echo "Building coverage-instrumented binary..."
+	@go build -cover -o bin/$(NAME)-integration-test main.go
+	@echo "Running integration tests with coverage..."
+	@GOCOVERDIR=$(PWD)/covdatafiles GITSWEEPER_TEST_BINARY=$(PWD)/bin/$(NAME)-integration-test go test -v -run "Test.*Command" .
+	@echo "Processing coverage data..."
+	@go tool covdata percent -i=$(PWD)/covdatafiles
+
+.PHONY: integration-cover-html
+integration-cover-html: integration-cover ## Generates HTML coverage report for integration tests
+	@echo "+ $@"
+	@go tool covdata textfmt -i=$(PWD)/covdatafiles -o=integration-coverage.txt
+	@go tool cover -html=integration-coverage.txt -o=integration-coverage.html
+	@echo "Integration coverage report generated: integration-coverage.html"
+
+.PHONY: integration-cover-func
+integration-cover-func: integration-cover ## Shows function-level coverage for integration tests
+	@echo "+ $@"
+	@go tool covdata textfmt -i=$(PWD)/covdatafiles -o=integration-coverage.txt
+	@go tool cover -func=integration-coverage.txt
+
+.PHONY: integration-cover-merge
+integration-cover-merge: integration-cover ## Merges integration coverage data files
+	@echo "+ $@"
+	@rm -rf merged-covdata
+	@mkdir -p merged-covdata
+	@go tool covdata merge -i=$(PWD)/covdatafiles -o=merged-covdata
+	@echo "Merged coverage data available in merged-covdata/"
+	@go tool covdata percent -i=merged-covdata
+
 .PHONY: clean-coverage
 clean-coverage: ## Removes all coverage files
 	@echo "+ $@"
-	$(RM) *.out *.html profile.out acceptance-coverage.out all-coverage.out
+	$(RM) *.out *.html *.txt profile.out acceptance-coverage.out all-coverage.out integration-coverage.txt
+	$(RM) -r covdatafiles merged-covdata
 
 .PHONY: install
 install: ## Installs the executable or package

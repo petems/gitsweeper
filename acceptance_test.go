@@ -25,7 +25,16 @@ func NewTestHelper(t *testing.T) *TestHelper {
 	workDir, err := os.MkdirTemp("", "gitsweeper-test-*")
 	require.NoError(t, err)
 
-	binPath := filepath.Join(workDir, "gitsweeper-test")
+	var binPath string
+
+	// Check if we should use a pre-built coverage-instrumented binary
+	if testBinary := os.Getenv("GITSWEEPER_TEST_BINARY"); testBinary != "" {
+		// Use the provided coverage-instrumented binary
+		binPath = testBinary
+	} else {
+		// Build our own test binary
+		binPath = filepath.Join(workDir, "gitsweeper-test")
+	}
 
 	helper := &TestHelper{
 		t:       t,
@@ -33,8 +42,10 @@ func NewTestHelper(t *testing.T) *TestHelper {
 		binPath: binPath,
 	}
 
-	// Build the test binary
-	helper.buildTestBinary()
+	// Build the test binary only if we're not using a pre-built one
+	if os.Getenv("GITSWEEPER_TEST_BINARY") == "" {
+		helper.buildTestBinary()
+	}
 
 	return helper
 }
@@ -61,6 +72,11 @@ func (h *TestHelper) RunCommand(args ...string) *CommandResult {
 func (h *TestHelper) RunCommandInDir(dir string, args ...string) *CommandResult {
 	cmd := exec.Command(h.binPath, args...)
 	cmd.Dir = dir
+
+	// Pass through GOCOVERDIR for integration coverage testing
+	if coverDir := os.Getenv("GOCOVERDIR"); coverDir != "" {
+		cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverDir)
+	}
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -94,6 +110,11 @@ func (h *TestHelper) RunCommandInteractive(input string, args ...string) *Comman
 func (h *TestHelper) RunCommandInteractiveInDir(dir, input string, args ...string) *CommandResult {
 	cmd := exec.Command(h.binPath, args...)
 	cmd.Dir = dir
+
+	// Pass through GOCOVERDIR for integration coverage testing
+	if coverDir := os.Getenv("GOCOVERDIR"); coverDir != "" {
+		cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverDir)
+	}
 
 	stdin, err := cmd.StdinPipe()
 	require.NoError(h.t, err)

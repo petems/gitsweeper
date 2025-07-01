@@ -16,8 +16,13 @@
 
 # Coverage reports
 *-coverage.html
+*-coverage.txt
 all-coverage.html
 acceptance-coverage.html
+integration-coverage.html
+integration-coverage.txt
+covdatafiles/
+merged-covdata/
 
 ### VisualStudioCode ###
 .vscode/*
