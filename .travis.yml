@@ -1,12 +1,10 @@
-sudo: required
 language: go
 before_install:
-  - gem install bundler
-  - bundle install
-  - docker pull petems/dummy-git-repo
+  - git config --global user.name "Travis CI"
+  - git config --global user.email "travis@travis-ci.org"
   - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin v1.15.0
 go:
-  - "1.12"
+  - "1.21.x"
 script:
-  - bundle exec cucumber
-  - make
+  - make test-all
+  - make build
