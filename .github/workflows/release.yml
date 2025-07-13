@@ -1,0 +1,135 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+        exclude:
+          # Exclude windows/arm64 as it's less common
+          - goos: windows
+            goarch: arm64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21.x'
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Get git commit
+        id: commit
+        run: echo "GIT_COMMIT=$(git log -1 --pretty=format:'%h')" >> $GITHUB_OUTPUT
+
+      - name: Set binary name
+        id: binary
+        run: |
+          BINARY_NAME=gitsweeper
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            BINARY_NAME="${BINARY_NAME}.exe"
+          fi
+          echo "BINARY_NAME=${BINARY_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          go build -ldflags "-X main.gitCommit=${{ steps.commit.outputs.GIT_COMMIT }} -s -w" \
+            -o ${{ steps.binary.outputs.BINARY_NAME }} .
+
+      - name: Create archive
+        id: archive
+        run: |
+          ARCHIVE_NAME="gitsweeper-${{ steps.version.outputs.VERSION }}-${{ matrix.goos }}-${{ matrix.goarch }}"
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            ARCHIVE_NAME="${ARCHIVE_NAME}.zip"
+            zip "${ARCHIVE_NAME}" ${{ steps.binary.outputs.BINARY_NAME }} README.md
+          else
+            ARCHIVE_NAME="${ARCHIVE_NAME}.tar.gz"
+            tar -czf "${ARCHIVE_NAME}" ${{ steps.binary.outputs.BINARY_NAME }} README.md
+          fi
+          echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ steps.archive.outputs.ARCHIVE_NAME }}
+          path: ${{ steps.archive.outputs.ARCHIVE_NAME }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: ./artifacts
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          release_name: Release ${{ steps.version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+          body: |
+            ## Changes in ${{ steps.version.outputs.VERSION }}
+            
+            ### Downloads
+            
+            Choose the appropriate binary for your platform:
+            
+            - **Linux (x86_64)**: `gitsweeper-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz`
+            - **Linux (ARM64)**: `gitsweeper-${{ steps.version.outputs.VERSION }}-linux-arm64.tar.gz`
+            - **macOS (Intel)**: `gitsweeper-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz`
+            - **macOS (Apple Silicon)**: `gitsweeper-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz`
+            - **Windows (x86_64)**: `gitsweeper-${{ steps.version.outputs.VERSION }}-windows-amd64.zip`
+            
+            ### Installation
+            
+            1. Download the appropriate archive for your platform
+            2. Extract the archive
+            3. Move the `gitsweeper` binary to a directory in your PATH
+            4. Make it executable (Linux/macOS): `chmod +x gitsweeper`
+
+      - name: Upload Release Assets
+        run: |
+          for file in ./artifacts/*/gitsweeper-*; do
+            if [ -f "$file" ]; then
+              echo "Uploading $file"
+              gh release upload ${{ steps.version.outputs.VERSION }} "$file"
+            fi
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

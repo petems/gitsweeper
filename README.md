@@ -28,11 +28,41 @@ These branches have been merged into master:
 
 ## Installation
 
+### Pre-built Binaries (Recommended)
+
+Download the latest release for your platform from the [GitHub releases page](https://github.com/petems/gitsweeper/releases):
+
+- **Linux (x86_64)**: `gitsweeper-vX.Y.Z-linux-amd64.tar.gz`
+- **Linux (ARM64)**: `gitsweeper-vX.Y.Z-linux-arm64.tar.gz`
+- **macOS (Intel)**: `gitsweeper-vX.Y.Z-darwin-amd64.tar.gz`
+- **macOS (Apple Silicon)**: `gitsweeper-vX.Y.Z-darwin-arm64.tar.gz`
+- **Windows (x86_64)**: `gitsweeper-vX.Y.Z-windows-amd64.zip`
+
+#### Installation Steps:
+
+1. Download the appropriate archive for your platform
+2. Extract the archive:
+   ```bash
+   # For Linux/macOS
+   tar -xzf gitsweeper-vX.Y.Z-your-platform.tar.gz
+   
+   # For Windows
+   unzip gitsweeper-vX.Y.Z-windows-amd64.zip
+   ```
+3. Move the binary to a directory in your PATH:
+   ```bash
+   # Linux/macOS
+   sudo mv gitsweeper /usr/local/bin/
+   chmod +x /usr/local/bin/gitsweeper
+   
+   # Windows: Move gitsweeper.exe to a directory in your PATH
+   ```
+
+### Build from Source
+
 ```bash
 go install github.com/petems/gitsweeper@latest
 ```
-
-Eventually I'll configure Travis to build binaries and setup a `brew tap` for OSX and Linux.
 
 ## Background
 
