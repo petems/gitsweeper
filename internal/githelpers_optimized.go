@@ -1,4 +1,4 @@
-//go:build !optimized
+//go:build optimized
 
 package internal
 
@@ -15,8 +15,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
-
-	log "github.com/sirupsen/logrus"
 )
 
 func RemoteBranches(s storer.ReferenceStorer) (storer.ReferenceIter, error) {
@@ -63,21 +61,19 @@ func RemoteBranchesToStrings(gitRemoteArray []*git.Remote) []string {
 }
 
 func GetCurrentDirAsGitRepo() (*git.Repository, error) {
-	log.Info("Getting current working directory")
+	LogInfo("Getting current working directory")
 
 	dir, err := os.Getwd()
-
-	log.Infof("Current working directory is %s", dir)
+	LogInfof("Current working directory is %s", dir)
 
 	if err != nil {
-		FatalError("Error opening current directory:", err)
+		LogFatalError("Error opening current directory:", err)
 		return nil, err
 	}
 
-	log.Infof("Attempting to open Git drectory at %s", dir)
+	LogInfof("Attempting to open Git directory at %s", dir)
 
 	repo, err := git.PlainOpen(dir)
-
 	if err != nil {
 		return nil, err
 	}
@@ -87,18 +83,17 @@ func GetCurrentDirAsGitRepo() (*git.Repository, error) {
 
 func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]string, error) {
 	repo, err := GetCurrentDirAsGitRepo()
-
 	if err != nil {
 		return nil, err
 	}
 
 	skipSlice := strings.Split(skipBranches, ",")
 
-	log.Info("Attempting to get master information from branches from repo")
+	LogInfo("Attempting to get master information from branches from repo")
 
 	branchRefs, err := repo.Branches()
 	if err != nil {
-		FatalError("list branches failed:", err)
+		LogFatalError("list branches failed:", err)
 	}
 
 	branchHeads := make(map[string]plumbing.Hash)
@@ -106,9 +101,8 @@ func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]s
 	fmt.Println("Fetching from the remote...")
 
 	listRemotes, err := repo.Remotes()
-
 	if err != nil {
-		FatalError("Error looking for remotes", err)
+		LogFatalError("Error looking for remotes", err)
 		return nil, err
 	}
 
@@ -126,21 +120,19 @@ func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]s
 	})
 
 	if err != nil {
-		FatalError("list branches failed:", err)
+		LogFatalError("list branches failed:", err)
 		return nil, err
 	}
 
 	masterCommits, err := repo.Log(&git.LogOptions{From: branchHeads[masterBranchName]})
-
 	if err != nil {
-		FatalError("get commits from master failed:", err)
+		LogFatalError("get commits from master failed:", err)
 		return nil, err
 	}
 
 	remoteBranches, err := RemoteBranches(repo.Storer)
-
 	if err != nil {
-		FatalError("list remote branches failed:", err)
+		LogFatalError("list remote branches failed:", err)
 		return nil, err
 	}
 
@@ -151,7 +143,7 @@ func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]s
 		remoteBranchHead := branch.Hash()
 		_, shortBranchName := ParseBranchname(remoteBranchName)
 		if slices.Contains(skipSlice, shortBranchName) {
-			log.Infof("Branch '%s' matches skip branch string '%s'", remoteBranchName, skipSlice)
+			LogInfof("Branch '%s' matches skip branch string '%s'", remoteBranchName, skipSlice)
 		} else {
 			remoteBranchHeads[remoteBranchName] = remoteBranchHead
 		}
@@ -159,44 +151,39 @@ func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]s
 	})
 
 	if err != nil {
-		FatalError("iterating remote branches failed:", err)
+		LogFatalError("iterating remote branches failed:", err)
 		return nil, err
 	}
 
-	for branchName, branchHead := range remoteBranchHeads {
-		log.Infof("Remote Branch %s head is: %s", branchName, branchHead)
-	}
-
 	mergedBranches := make([]string, 0)
-
 	masterBranchRemote := fmt.Sprintf("%s/%s", remoteOrigin, masterBranchName)
-
 	delete(remoteBranchHeads, masterBranchRemote)
 
-	log.Infof("Origin has been set to '%s', restricting branches to preview to that origin", remoteOrigin)
+	LogInfof("Origin has been set to '%s', restricting branches to preview to that origin", remoteOrigin)
 
 	// Filter branches by origin early to reduce search space
 	originBranches := make(map[string]plumbing.Hash)
 	for branchName, branchHead := range remoteBranchHeads {
 		remote, _ := ParseBranchname(branchName)
 		if remote == remoteOrigin {
-			log.Infof("Branch '%s' matches remote '%s'", branchName, remoteOrigin)
+			LogInfof("Branch '%s' matches remote '%s'", branchName, remoteOrigin)
 			originBranches[branchName] = branchHead
 		} else {
-			log.Infof("Branch '%s' does not match remote '%s', not adding to", branchName, remoteOrigin)
+			LogInfof("Branch '%s' does not match remote '%s', not adding", branchName, remoteOrigin)
 		}
 	}
 
 	// Early exit if no branches to check
 	if len(originBranches) == 0 {
-		log.Info("No branches found for the specified origin")
+		LogInfo("No branches found for the specified origin")
 		return mergedBranches, nil
 	}
 
-	// Create a hash set for faster lookups
-	branchHashes := make(map[string]string, len(originBranches))
+	// Create a hash set for faster lookups - Handle multiple branches with same hash
+	branchHashes := make(map[string][]string, len(originBranches))
 	for branchName, branchHead := range originBranches {
-		branchHashes[branchHead.String()] = branchName
+		hashStr := branchHead.String()
+		branchHashes[hashStr] = append(branchHashes[hashStr], branchName)
 	}
 
 	// Iterate through commits with early termination
@@ -208,21 +195,24 @@ func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]s
 		}
 
 		commitHash := commit.Hash.String()
-		if branchName, exists := branchHashes[commitHash]; exists && !foundBranches[branchName] {
-			log.Infof("Branch %s head (%s) was found in master, so has been merged!\n", branchName, commitHash)
-			mergedBranches = append(mergedBranches, branchName)
-			foundBranches[branchName] = true
+		if branchNames, exists := branchHashes[commitHash]; exists {
+			for _, branchName := range branchNames {
+				if !foundBranches[branchName] {
+					LogInfof("Branch %s head (%s) was found in master, so has been merged!", branchName, commitHash)
+					mergedBranches = append(mergedBranches, branchName)
+					foundBranches[branchName] = true
+				}
+			}
 		}
 		return nil
 	})
 
 	// Handle early termination error (which is expected)
 	if err != nil && err.Error() != "all branches found" {
-		FatalError("looking for merged commits failed:", err)
+		LogFatalError("looking for merged commits failed:", err)
 		return nil, err
 	}
 
 	sort.Strings(mergedBranches)
-
 	return mergedBranches, nil
 }

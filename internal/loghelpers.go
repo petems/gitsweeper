@@ -1,3 +1,5 @@
+//go:build !optimized
+
 package internal
 
 import (

@@ -1,4 +1,4 @@
-//go:build !optimized
+//go:build optimized
 
 package main
 
@@ -42,16 +42,14 @@ func main() {
 	switch kingpin.MustParse(app.Parse(os.Args[1:])) {
 	case preview.FullCommand():
 
-		hlpr.SetupLogger(*debug)
+		hlpr.SetupLightLogger(*debug)
 
 		_, err := hlpr.GetCurrentDirAsGitRepo()
-
 		if err != nil {
 			kingpin.Fatalf("This is not a Git repository")
 		}
 
 		mergedBranches, err := hlpr.GetMergedBranches(*previewOrigin, *previewMaster, *previewSkip)
-
 		if err != nil {
 			kingpin.Fatalf("Error when looking for branches: %s", err)
 		}
@@ -65,12 +63,12 @@ func main() {
 			}
 			fmt.Println("\nTo delete them, run again with `gitsweeper cleanup`")
 		}
+
 	case cleanup.FullCommand():
 
-		hlpr.SetupLogger(*debug)
+		hlpr.SetupLightLogger(*debug)
 
 		mergedBranches, err := hlpr.GetMergedBranches(*cleanupOrigin, *cleanupMaster, *cleanupSkip)
-
 		if err != nil {
 			kingpin.Fatalf("Error when looking for branches %s", err)
 		}
@@ -85,7 +83,7 @@ func main() {
 			if !*(cleanupForce) {
 				confirmDeleteBranches, err := hlpr.AskForConfirmation("Delete these branches?", os.Stdin)
 				if err != nil {
-					hlpr.FatalError("\nError when awaiting input", err)
+					hlpr.LogFatalError("\nError when awaiting input", err)
 				} else {
 					if !confirmDeleteBranches {
 						fmt.Printf("OK, aborting.\n")
@@ -100,17 +98,18 @@ func main() {
 				repo, _ := hlpr.GetCurrentDirAsGitRepo()
 				err := hlpr.DeleteBranch(repo, remote, branchShort)
 				if err != nil {
-					hlpr.FatalError("\nCould not delete branch", err)
+					hlpr.LogFatalError("\nCould not delete branch", err)
 				} else {
 					fmt.Printf(" - (done)\n")
 				}
 			}
 		}
+
 	case version.FullCommand():
-		hlpr.SetupLogger(*debug)
+		hlpr.SetupLightLogger(*debug)
 		fmt.Printf("%s %s\n", Version, gitCommit)
+
 	default:
 		os.Exit(0)
 	}
-
 }

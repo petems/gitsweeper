@@ -12,7 +12,7 @@ Then('the build should be present') do
 end
 
 Given("a build of gitsweeper") do
-  raise 'gitsweeper build failed' unless system("go build -o bin/gitsweeper-int-test main.go")
+  raise 'gitsweeper build failed' unless system("go build -tags optimized -o bin/gitsweeper-int-test")
 end
 
 Given(/nothings running on port "(\w+)"/) do |port|
