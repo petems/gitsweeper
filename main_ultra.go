@@ -1,0 +1,153 @@
+//go:build ultra
+
+package main
+
+import (
+	"flag"
+	"fmt"
+	"os"
+
+	hlpr "github.com/petems/gitsweeper/internal"
+)
+
+// Version is what is returned by the `-v` flag
+const Version = "0.1.0"
+
+// gitCommit is the gitcommit its built from
+var gitCommit = "development"
+
+func main() {
+	// Define command-line flags using standard library
+	var (
+		debug   = flag.Bool("debug", false, "Enable debug mode")
+		version = flag.Bool("version", false, "Show version")
+		help    = flag.Bool("help", false, "Show help")
+		origin  = flag.String("origin", "origin", "The name of the remote you wish to clean up")
+		master  = flag.String("master", "master", "The name of what you consider the master branch")
+		skip    = flag.String("skip", "", "Comma-separated list of branches to skip")
+		force   = flag.Bool("force", false, "Do not ask, cleanup immediately")
+	)
+
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "GitSweeper - A command-line tool for cleaning up merged branches.\n\n")
+		fmt.Fprintf(os.Stderr, "Usage: %s [options] <command>\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Commands:\n")
+		fmt.Fprintf(os.Stderr, "  preview    Show the branches to delete\n")
+		fmt.Fprintf(os.Stderr, "  cleanup    Delete the remote branches\n")
+		fmt.Fprintf(os.Stderr, "  version    Show the version\n\n")
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		flag.PrintDefaults()
+	}
+
+	flag.Parse()
+
+	// Handle version flag
+	if *version {
+		fmt.Printf("%s %s\n", Version, gitCommit)
+		return
+	}
+
+	// Handle help flag
+	if *help || flag.NArg() == 0 {
+		flag.Usage()
+		return
+	}
+
+	command := flag.Arg(0)
+
+	// Setup lightweight logger
+	hlpr.SetupLightLogger(*debug)
+
+	switch command {
+	case "preview":
+		handlePreview(*origin, *master, *skip)
+	case "cleanup":
+		handleCleanup(*origin, *master, *skip, *force)
+	case "version":
+		fmt.Printf("%s %s\n", Version, gitCommit)
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", command)
+		flag.Usage()
+		os.Exit(1)
+	}
+}
+
+func handlePreview(origin, master, skipBranches string) {
+	_, err := hlpr.GetCurrentDirAsGitRepo()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: This is not a Git repository\n")
+		os.Exit(1)
+	}
+
+	mergedBranches, err := hlpr.GetMergedBranches(origin, master, skipBranches)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when looking for branches: %s\n", err)
+		os.Exit(1)
+	}
+
+	if len(mergedBranches) == 0 {
+		fmt.Println("No remote branches are available for cleaning up")
+	} else {
+		fmt.Println("\nThese branches have been merged into master:")
+		for _, branchName := range mergedBranches {
+			fmt.Printf("  %s\n", branchName)
+		}
+		fmt.Println("\nTo delete them, run again with `gitsweeper cleanup`")
+	}
+}
+
+func handleCleanup(origin, master, skipBranches string, force bool) {
+	_, err := hlpr.GetCurrentDirAsGitRepo()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: This is not a Git repository\n")
+		os.Exit(1)
+	}
+
+	mergedBranches, err := hlpr.GetMergedBranches(origin, master, skipBranches)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when looking for branches: %s\n", err)
+		os.Exit(1)
+	}
+
+	if len(mergedBranches) == 0 {
+		fmt.Println("No remote branches are available for cleaning up")
+		return
+	}
+
+	fmt.Println("\nThese branches have been merged into master:")
+	for _, branchName := range mergedBranches {
+		fmt.Printf("  %s\n", branchName)
+	}
+
+	if !force {
+		confirmDeleteBranches, err := hlpr.AskForConfirmation("Delete these branches?", os.Stdin)
+		if err != nil {
+			hlpr.LogFatalError("\nError when awaiting input", err)
+		}
+		if !confirmDeleteBranches {
+			fmt.Printf("OK, aborting.\n")
+			return
+		}
+	}
+
+	fmt.Printf("\n")
+	repo, _ := hlpr.GetCurrentDirAsGitRepo()
+	
+	// Process deletions with progress indication for large sets
+	total := len(mergedBranches)
+	for i, branchName := range mergedBranches {
+		remote, branchShort := hlpr.ParseBranchname(branchName)
+		if total > 10 {
+			fmt.Printf("  [%d/%d] deleting %s", i+1, total, branchName)
+		} else {
+			fmt.Printf("  deleting %s", branchName)
+		}
+		
+		err := hlpr.DeleteBranch(repo, remote, branchShort)
+		if err != nil {
+			fmt.Printf(" - (failed: %s)\n", err)
+		} else {
+			fmt.Printf(" - (done)\n")
+		}
+	}
+}

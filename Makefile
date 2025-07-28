@@ -23,7 +23,12 @@ build-ultra-optimized:
 	@echo "GOPATH=${GOPATH}"
 	CGO_ENABLED=0 go build -tags optimized -ldflags="-s -w -X main.gitCommit=${GIT_COMMIT}" -trimpath -a -installsuffix cgo -o bin/${NAME}-ultra
 
-size-comparison: build build-optimized build-ultra-optimized
+build-ultra-no-deps:
+	@echo "building ultra-optimized no-deps ${NAME} ${VERSION}"
+	@echo "GOPATH=${GOPATH}"
+	CGO_ENABLED=0 go build -tags ultra -ldflags="-s -w -X main.gitCommit=${GIT_COMMIT}" -trimpath -a -installsuffix cgo -o bin/${NAME}-ultra-nodeps
+
+size-comparison: build build-optimized build-ultra-optimized build-ultra-no-deps
 	@echo "Binary size comparison:"
 	@ls -lh bin/${NAME}* | awk '{print $$9 " - " $$5}' | sort
 
