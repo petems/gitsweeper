@@ -158,8 +158,7 @@ execute_source_install() {
   fi
   
   # Create target directory in original location
-  mkdir -p "${ORIGINAL_DIR}/${BINDIR}"
-  if [ $? -ne 0 ]; then
+  if ! mkdir -p "${ORIGINAL_DIR}/${BINDIR}"; then
     log_crit "failed to create directory ${ORIGINAL_DIR}/${BINDIR}"
     exit 1
   fi
