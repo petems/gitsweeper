@@ -19,15 +19,15 @@ import (
 )
 
 const (
-	// MaxCommitsToCheck limits how many commits to check for merged branches
+	// MaxCommitsToCheck limits how many commits to check for merged branches.
 	MaxCommitsToCheck = 10000
-	// ConcurrentWorkers defines how many goroutines to use for concurrent processing
+	// ConcurrentWorkers defines how many goroutines to use for concurrent processing.
 	ConcurrentWorkers = 4
-	// BatchSize for processing commits in batches
+	// BatchSize for processing commits in batches.
 	BatchSize = 100
 )
 
-// BranchInfo holds optimized branch information
+// BranchInfo holds optimized branch information.
 type BranchInfo struct {
 	Name   string
 	Hash   plumbing.Hash
@@ -35,7 +35,7 @@ type BranchInfo struct {
 	Short  string
 }
 
-// commitBatch represents a batch of commits to process
+// commitBatch represents a batch of commits to process.
 type commitBatch struct {
 	commits  []*object.Commit
 	startIdx int
@@ -104,7 +104,7 @@ func GetCurrentDirAsGitRepo() (*git.Repository, error) {
 	return repo, nil
 }
 
-// GetMergedBranchesUltra implements ultra-optimized merged branch detection
+// GetMergedBranchesUltra implements ultra-optimized merged branch detection.
 func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]string, error) {
 	repo, err := GetCurrentDirAsGitRepo()
 	if err != nil {
@@ -179,7 +179,7 @@ func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]s
 	return findMergedBranchesSequential(ctx, masterCommits, remoteBranches)
 }
 
-// getBranchHeadsOptimized efficiently gets all branch heads
+// getBranchHeadsOptimized efficiently gets all branch heads.
 func getBranchHeadsOptimized(repo *git.Repository) (map[string]plumbing.Hash, error) {
 	branchRefs, err := repo.Branches()
 	if err != nil {
@@ -201,8 +201,12 @@ func getBranchHeadsOptimized(repo *git.Repository) (map[string]plumbing.Hash, er
 	return branchHeads, nil
 }
 
-// getRemoteBranchesOptimized efficiently gets remote branches with filtering
-func getRemoteBranchesOptimized(repo *git.Repository, remoteOrigin string, skipSet map[string]bool) ([]BranchInfo, error) {
+// getRemoteBranchesOptimized efficiently gets remote branches with filtering.
+func getRemoteBranchesOptimized(
+	repo *git.Repository,
+	remoteOrigin string,
+	skipSet map[string]bool,
+) ([]BranchInfo, error) {
 	remoteBranches, err := RemoteBranches(repo.Storer)
 	if err != nil {
 		return nil, fmt.Errorf("list remote branches failed: %w", err)
@@ -247,8 +251,12 @@ func getRemoteBranchesOptimized(repo *git.Repository, remoteOrigin string, skipS
 	return branches, nil
 }
 
-// findMergedBranchesSequential processes branches sequentially with optimizations
-func findMergedBranchesSequential(ctx context.Context, masterCommits object.CommitIter, branches []BranchInfo) ([]string, error) {
+// findMergedBranchesSequential processes branches sequentially with optimizations.
+func findMergedBranchesSequential(
+	ctx context.Context,
+	masterCommits object.CommitIter,
+	branches []BranchInfo,
+) ([]string, error) {
 	// Create hash lookup map
 	branchHashMap := make(map[string][]BranchInfo, len(branches))
 	for _, branch := range branches {
@@ -272,12 +280,12 @@ func findMergedBranchesSequential(ctx context.Context, masterCommits object.Comm
 		commitCount++
 		if commitCount > MaxCommitsToCheck {
 			LogInfof("Reached maximum commit limit (%d), stopping search", MaxCommitsToCheck)
-			return fmt.Errorf("max commits reached")
+			return errors.New("max commits reached")
 		}
 
 		// Early termination when all branches found
 		if len(foundBranches) == len(branches) {
-			return fmt.Errorf("all branches found")
+			return errors.New("all branches found")
 		}
 
 		// Check if this commit hash matches any branch
@@ -285,7 +293,11 @@ func findMergedBranchesSequential(ctx context.Context, masterCommits object.Comm
 		if branchInfos, exists := branchHashMap[commitHash]; exists {
 			for _, branchInfo := range branchInfos {
 				if !foundBranches[branchInfo.Name] {
-					LogInfof("Branch %s head (%s) was found in master, so has been merged!", branchInfo.Name, commitHash)
+					LogInfof(
+						"Branch %s head (%s) was found in master, so has been merged!",
+						branchInfo.Name,
+						commitHash,
+					)
 					mergedBranches = append(mergedBranches, branchInfo.Name)
 					foundBranches[branchInfo.Name] = true
 				}
@@ -304,8 +316,12 @@ func findMergedBranchesSequential(ctx context.Context, masterCommits object.Comm
 	return mergedBranches, nil
 }
 
-// findMergedBranchesConcurrent processes branches using concurrent workers
-func findMergedBranchesConcurrent(ctx context.Context, masterCommits object.CommitIter, branches []BranchInfo) ([]string, error) {
+// findMergedBranchesConcurrent processes branches using concurrent workers.
+func findMergedBranchesConcurrent(
+	ctx context.Context,
+	masterCommits object.CommitIter,
+	branches []BranchInfo,
+) ([]string, error) {
 	// Create hash lookup map
 	branchHashMap := make(map[string][]BranchInfo, len(branches))
 	for _, branch := range branches {
@@ -319,7 +335,7 @@ func findMergedBranchesConcurrent(ctx context.Context, masterCommits object.Comm
 
 	// Start worker goroutines
 	var wg sync.WaitGroup
-	numWorkers := min(ConcurrentWorkers, runtime.NumCPU())
+	numWorkers := minInt(ConcurrentWorkers, runtime.NumCPU())
 
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
@@ -349,7 +365,7 @@ func findMergedBranchesConcurrent(ctx context.Context, masterCommits object.Comm
 			// Limit the number of commits to check
 			commitCount++
 			if commitCount > MaxCommitsToCheck {
-				return fmt.Errorf("max commits reached")
+				return errors.New("max commits reached")
 			}
 
 			batch = append(batch, commit)
@@ -397,11 +413,23 @@ func findMergedBranchesConcurrent(ctx context.Context, masterCommits object.Comm
 	}
 
 	sort.Strings(allMerged)
-	return allMerged, nil
+
+	// Check if context was cancelled
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+		return allMerged, nil
+	}
 }
 
-// processCommitBatches processes batches of commits in a worker goroutine
-func processCommitBatches(ctx context.Context, batches <-chan commitBatch, branchHashMap map[string][]BranchInfo, totalBranches int) []string {
+// processCommitBatches processes batches of commits in a worker goroutine.
+func processCommitBatches(
+	ctx context.Context,
+	batches <-chan commitBatch,
+	branchHashMap map[string][]BranchInfo,
+	totalBranches int,
+) []string {
 	var mergedBranches []string
 	foundBranches := make(map[string]bool)
 
@@ -424,7 +452,11 @@ func processCommitBatches(ctx context.Context, batches <-chan commitBatch, branc
 			if branchInfos, exists := branchHashMap[commitHash]; exists {
 				for _, branchInfo := range branchInfos {
 					if !foundBranches[branchInfo.Name] {
-						LogInfof("Branch %s head (%s) was found in master, so has been merged!", branchInfo.Name, commitHash)
+						LogInfof(
+							"Branch %s head (%s) was found in master, so has been merged!",
+							branchInfo.Name,
+							commitHash,
+						)
 						mergedBranches = append(mergedBranches, branchInfo.Name)
 						foundBranches[branchInfo.Name] = true
 					}
@@ -436,8 +468,8 @@ func processCommitBatches(ctx context.Context, batches <-chan commitBatch, branc
 	return mergedBranches
 }
 
-// min returns the minimum of two integers
-func min(a, b int) int {
+// min returns the minimum of two integers.
+func minInt(a, b int) int {
 	if a < b {
 		return a
 	}
