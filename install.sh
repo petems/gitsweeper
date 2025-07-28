@@ -65,15 +65,13 @@ execute() {
   http_download "${tmpdir}/${TARBALL}" "${TARBALL_URL}"
   http_download "${tmpdir}/${CHECKSUM}" "${CHECKSUM_URL}"
   hash_sha256_verify "${tmpdir}/${TARBALL}" "${tmpdir}/${CHECKSUM}"
-  srcdir="${tmpdir}/${NAME}"
-  rm -rf "${srcdir}"
   (cd "${tmpdir}" && untar "${TARBALL}")
   test ! -d "${BINDIR}" && install -d "${BINDIR}"
   for binexe in $BINARIES; do
     if [ "$OS" = "windows" ]; then
       binexe="${binexe}.exe"
     fi
-    install "${srcdir}/${binexe}" "${BINDIR}/"
+    install "${tmpdir}/${binexe}" "${BINDIR}/"
     log_info "installed ${BINDIR}/${binexe}"
   done
   rm -rf "${tmpdir}"
@@ -183,6 +181,7 @@ echoerr() {
   echo "$@" 1>&2
 }
 log_prefix() {
+  # shellcheck disable=SC2317
   echo "$0"
 }
 _logp=6
@@ -246,7 +245,7 @@ uname_arch() {
     armv6*) arch="armv6" ;;
     armv7*) arch="armv7" ;;
   esac
-  echo ${arch}
+  echo "${arch}"
 }
 uname_os_check() {
   os=$(uname_os)
@@ -401,6 +400,8 @@ EOF
 PROJECT_NAME="gitsweeper"
 OWNER="petems"
 REPO="gitsweeper"
+# shellcheck disable=SC2034
+# BINARY variable is used by the shlib framework but not directly in this script
 BINARY="gitsweeper"
 FORMAT=tar.gz
 OS=$(uname_os)
@@ -432,7 +433,7 @@ adjust_arch
 log_info "found version: ${VERSION} for ${TAG}/${OS}/${ARCH}"
 
 # Archive naming should match GitHub Actions release workflow
-NAME=${PROJECT_NAME}-${TAG}-${OS}-${ARCH}
+NAME=${PROJECT_NAME}-${VERSION}-${OS}-${ARCH}
 if [ "$OS" = "windows" ]; then
   FORMAT=zip
 else
@@ -440,7 +441,7 @@ else
 fi
 TARBALL=${NAME}.${FORMAT}
 TARBALL_URL=${GITHUB_DOWNLOAD}/${TAG}/${TARBALL}
-CHECKSUM=${PROJECT_NAME}_${VERSION}_checksums.txt
+CHECKSUM=checksums.txt
 CHECKSUM_URL=${GITHUB_DOWNLOAD}/${TAG}/${CHECKSUM}
 
 execute

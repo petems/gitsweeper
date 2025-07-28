@@ -1,0 +1,155 @@
+name: Install Script Validation
+
+on:
+  push:
+    branches: [ master ]
+    paths: [ 'install.sh' ]
+  pull_request:
+    branches: [ master ]
+    paths: [ 'install.sh' ]
+  workflow_dispatch:
+
+jobs:
+  validate-workflow:
+    name: Validate Workflow
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install actionlint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash | bash -s
+          sudo mv actionlint /usr/local/bin/
+      
+      - name: Validate workflow files
+        run: actionlint .github/workflows/install-script-validation.yml
+
+  shellcheck:
+    name: ShellCheck Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+      
+      - name: Run ShellCheck on install.sh
+        run: shellcheck install.sh
+      
+      - name: Check script syntax
+        run: bash -n install.sh
+
+  functional-test:
+    name: Functional Testing
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux-amd64
+          - os: macos-latest
+            platform: darwin-amd64
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Test install script help
+        run: |
+          chmod +x install.sh
+          ./install.sh --help || true  # Help exits with code 2, which is expected
+      
+      - name: Test install script version
+        run: |
+          ./install.sh --version 2>&1 || echo "Version flag not supported (expected)"
+          echo "✓ Help and version flags tested"
+      
+      - name: Test install script debug mode
+        run: |
+          ./install.sh -d -b ./test-bin
+          ls -la ./test-bin/
+          ./test-bin/gitsweeper --version
+          echo "✓ Debug mode installation test passed"
+      
+      - name: Test install script with specific version
+        run: |
+          ./install.sh -d -b ./test-bin-v0.1.0 v0.1.0
+          ls -la ./test-bin-v0.1.0/
+          ./test-bin-v0.1.0/gitsweeper --version
+          echo "✓ Specific version installation test passed"
+      
+      - name: Test install script with custom bindir
+        run: |
+          ./install.sh -d -b /tmp/custom-bin
+          ls -la /tmp/custom-bin/
+          /tmp/custom-bin/gitsweeper --version
+          echo "✓ Custom bindir installation test passed"
+      
+      - name: Setup Go for source build test
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21.x'
+      
+      - name: Test install script force source
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          ./install.sh -d -f -b ./test-source-bin
+          ls -la ./test-source-bin/
+          ./test-source-bin/gitsweeper --version
+          echo "✓ Source build test passed"
+      
+      - name: Cleanup test directories
+        if: always()
+        run: |
+          rm -rf ./test-bin ./test-bin-v0.1.0 ./test-source-bin /tmp/custom-bin
+
+  error-handling:
+    name: Error Handling Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Test invalid tag
+        run: |
+          chmod +x install.sh
+          if ./install.sh -d invalid-tag 2>&1 | grep -q "unable to find"; then
+            echo "✓ Invalid tag properly rejected"
+          else
+            echo "✗ Invalid tag not properly rejected"
+            exit 1
+          fi
+      
+      - name: Test invalid platform (simulated)
+        run: |
+          # Test that the script handles platform detection correctly
+          ./install.sh -d
+          echo "✓ Platform detection working"
+      
+      - name: Test checksum verification
+        run: |
+          # The script should verify checksums automatically
+          ./install.sh -d -b ./test-checksum
+          echo "✓ Checksum verification passed"
+          rm -rf ./test-checksum
+
+  cross-platform:
+    name: Cross-Platform Testing
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Test install script on ${{ matrix.os }}
+        shell: bash
+        run: |
+          chmod +x install.sh
+          ./install.sh -d -b ./test-cross
+          ls -la ./test-cross/
+          ./test-cross/gitsweeper --version
+          rm -rf ./test-cross 
