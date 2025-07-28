@@ -434,11 +434,7 @@ log_info "found version: ${VERSION} for ${TAG}/${OS}/${ARCH}"
 
 # Archive naming should match GitHub Actions release workflow
 NAME=${PROJECT_NAME}-${VERSION}-${OS}-${ARCH}
-if [ "$OS" = "windows" ]; then
-  FORMAT=zip
-else
-  FORMAT=tar.gz
-fi
+FORMAT=tar.gz
 TARBALL=${NAME}.${FORMAT}
 TARBALL_URL=${GITHUB_DOWNLOAD}/${TAG}/${TARBALL}
 CHECKSUM=checksums.txt
