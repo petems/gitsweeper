@@ -37,7 +37,7 @@ type BranchInfo struct {
 
 // commitBatch represents a batch of commits to process
 type commitBatch struct {
-	commits []*object.Commit
+	commits  []*object.Commit
 	startIdx int
 }
 
@@ -112,7 +112,12 @@ func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]s
 	}
 
 	// Convert skip branches to a set for O(1) lookups
-	skipSet := StringSliceToSet(strings.Split(skipBranches, ","))
+	var skipSet map[string]bool
+	if skipBranches != "" {
+		skipSet = StringSliceToSet(strings.Split(skipBranches, ","))
+	} else {
+		skipSet = make(map[string]bool)
+	}
 
 	LogInfo("Attempting to get master information from branches from repo")
 
@@ -182,7 +187,7 @@ func getBranchHeadsOptimized(repo *git.Repository) (map[string]plumbing.Hash, er
 	}
 
 	branchHeads := make(map[string]plumbing.Hash)
-	
+
 	err = branchRefs.ForEach(func(reference *plumbing.Reference) error {
 		branchName := strings.TrimPrefix(reference.Name().String(), "refs/heads/")
 		branchHeads[branchName] = reference.Hash()
@@ -208,16 +213,22 @@ func getRemoteBranchesOptimized(repo *git.Repository, remoteOrigin string, skipS
 
 	err = remoteBranches.ForEach(func(branch *plumbing.Reference) error {
 		remoteBranchName := strings.TrimPrefix(branch.Name().String(), "refs/remotes/")
-		
+
 		// Skip master branch
 		if remoteBranchName == masterBranchRemote {
 			return nil
 		}
 
 		remote, shortBranchName := ParseBranchname(remoteBranchName)
-		
+
 		// Filter by origin and skip list
-		if remote == remoteOrigin && !IsStringInSet(shortBranchName, skipSet) {
+		if remote == remoteOrigin {
+			// Check if this branch should be skipped
+			if IsStringInSet(shortBranchName, skipSet) {
+				LogInfof("Branch '%s' matches skip branch string '[%s]'", remoteBranchName, shortBranchName)
+				return nil
+			}
+
 			branches = append(branches, BranchInfo{
 				Name:   remoteBranchName,
 				Hash:   branch.Hash(),
@@ -305,11 +316,11 @@ func findMergedBranchesConcurrent(ctx context.Context, masterCommits object.Comm
 	// Channel for commit batches
 	commitBatches := make(chan commitBatch, ConcurrentWorkers*2)
 	results := make(chan []string, ConcurrentWorkers)
-	
+
 	// Start worker goroutines
 	var wg sync.WaitGroup
 	numWorkers := min(ConcurrentWorkers, runtime.NumCPU())
-	
+
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
 		go func() {
@@ -322,11 +333,11 @@ func findMergedBranchesConcurrent(ctx context.Context, masterCommits object.Comm
 	// Producer goroutine to batch commits
 	go func() {
 		defer close(commitBatches)
-		
+
 		var batch []*object.Commit
 		commitCount := 0
 		batchStartIdx := 0
-		
+
 		err := masterCommits.ForEach(func(commit *object.Commit) error {
 			// Check context for cancellation
 			select {
@@ -342,7 +353,7 @@ func findMergedBranchesConcurrent(ctx context.Context, masterCommits object.Comm
 			}
 
 			batch = append(batch, commit)
-			
+
 			// Send batch when it's full
 			if len(batch) >= BatchSize {
 				select {
@@ -353,7 +364,7 @@ func findMergedBranchesConcurrent(ctx context.Context, masterCommits object.Comm
 					return ctx.Err()
 				}
 			}
-			
+
 			return nil
 		})
 
@@ -375,7 +386,7 @@ func findMergedBranchesConcurrent(ctx context.Context, masterCommits object.Comm
 	// Collect and merge results from all workers
 	var allMerged []string
 	seenBranches := make(map[string]bool)
-	
+
 	for workerResults := range results {
 		for _, branch := range workerResults {
 			if !seenBranches[branch] {

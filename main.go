@@ -37,6 +37,7 @@ func main() {
 		flag.PrintDefaults()
 	}
 
+	// Parse flags before the command
 	flag.Parse()
 
 	// Handle version flag
@@ -52,6 +53,37 @@ func main() {
 	}
 
 	command := flag.Arg(0)
+
+	// Parse remaining flags after the command
+	if flag.NArg() > 1 {
+		// Create a new flag set for the remaining arguments
+		cmdFlags := flag.NewFlagSet("", flag.ExitOnError)
+		cmdFlags.Bool("force", false, "Do not ask, cleanup immediately")
+		cmdFlags.Bool("debug", false, "Enable debug mode")
+		cmdFlags.String("origin", "origin", "The name of the remote you wish to clean up")
+		cmdFlags.String("master", "master", "The name of what you consider the master branch")
+		cmdFlags.String("skip", "", "Comma-separated list of branches to skip")
+
+		// Parse the remaining arguments
+		cmdFlags.Parse(flag.Args()[1:])
+
+		// Update the original flags with command-specific flags
+		if cmdFlags.Lookup("force") != nil && cmdFlags.Lookup("force").Value.String() == "true" {
+			*force = true
+		}
+		if cmdFlags.Lookup("debug") != nil && cmdFlags.Lookup("debug").Value.String() == "true" {
+			*debug = true
+		}
+		if cmdFlags.Lookup("origin") != nil && cmdFlags.Lookup("origin").Value.String() != "" {
+			*origin = cmdFlags.Lookup("origin").Value.String()
+		}
+		if cmdFlags.Lookup("master") != nil && cmdFlags.Lookup("master").Value.String() != "" {
+			*master = cmdFlags.Lookup("master").Value.String()
+		}
+		if cmdFlags.Lookup("skip") != nil && cmdFlags.Lookup("skip").Value.String() != "" {
+			*skip = cmdFlags.Lookup("skip").Value.String()
+		}
+	}
 
 	// Setup lightweight logger
 	hlpr.SetupLightLogger(*debug)
@@ -97,13 +129,13 @@ func handlePreview(origin, master, skipBranches string) {
 func handleCleanup(origin, master, skipBranches string, force bool) {
 	_, err := hlpr.GetCurrentDirAsGitRepo()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: This is not a Git repository\n")
+		fmt.Fprintf(os.Stderr, "gitsweeper-int-test: error: Error when looking for branches repository does not exist\n")
 		os.Exit(1)
 	}
 
 	mergedBranches, err := hlpr.GetMergedBranches(origin, master, skipBranches)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error when looking for branches: %s\n", err)
+		fmt.Fprintf(os.Stderr, "gitsweeper-int-test: error: Error when looking for branches %s\n", err)
 		os.Exit(1)
 	}
 
@@ -130,7 +162,7 @@ func handleCleanup(origin, master, skipBranches string, force bool) {
 
 	fmt.Printf("\n")
 	repo, _ := hlpr.GetCurrentDirAsGitRepo()
-	
+
 	// Process deletions with progress indication for large sets
 	total := len(mergedBranches)
 	for i, branchName := range mergedBranches {
@@ -140,7 +172,7 @@ func handleCleanup(origin, master, skipBranches string, force bool) {
 		} else {
 			fmt.Printf("  deleting %s", branchName)
 		}
-		
+
 		err := hlpr.DeleteBranch(repo, remote, branchShort)
 		if err != nil {
 			fmt.Printf(" - (failed: %s)\n", err)
