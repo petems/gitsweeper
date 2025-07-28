@@ -49,15 +49,18 @@ curl -sSfL https://raw.githubusercontent.com/petems/gitsweeper/master/install.sh
 ### Homebrew (macOS)
 
 ```bash
-# Add the tap
-brew tap petems/gitsweeper
+# Install directly from the formula in this repository
+brew install --formula Formula/gitsweeper.rb
 
-# Install gitsweeper
+# Or if you prefer using a tap (requires separate homebrew-gitsweeper repository)
+brew tap petems/gitsweeper
 brew install gitsweeper
 
-# Or force compilation from source
-brew install --build-from-source gitsweeper
+# Force compilation from source (auto-detects platform, prefers binaries for speed)
+brew install --build-from-source --formula Formula/gitsweeper.rb
 ```
+
+> See [Formula/README.md](Formula/README.md) for more details about the Homebrew formula.
 
 ### Pre-built Binaries
 
