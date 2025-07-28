@@ -13,7 +13,6 @@ import (
 // until it gets a valid response from the user.
 //
 //	AskForConfirmation("Do you want to restart?", os.Stdin)
-//
 func AskForConfirmation(s string, in io.Reader) (bool, error) {
 	reader := bufio.NewReader(in)
 
@@ -27,9 +26,10 @@ func AskForConfirmation(s string, in io.Reader) (bool, error) {
 
 		response = strings.ToLower(strings.TrimSpace(response))
 
-		if response == "y" || response == "yes" {
+		switch response {
+		case "y", "yes":
 			return true, nil
-		} else if response == "n" || response == "no" {
+		case "n", "no":
 			return false, nil
 		}
 	}
