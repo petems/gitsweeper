@@ -32,7 +32,7 @@ jobs:
           SHA256=$(curl -sL "$SOURCE_URL" | sha256sum | cut -d' ' -f1)
           echo "SOURCE_SHA256=${SHA256}" >> $GITHUB_OUTPUT
 
-      - name: Calculate SHA256 for binary archive
+      - name: Calculate SHA256 for Intel binary archive
         id: binary_sha
         run: |
           BINARY_URL="https://github.com/petems/gitsweeper/releases/download/${{ steps.release.outputs.VERSION }}/gitsweeper-${{ steps.release.outputs.VERSION }}-darwin-amd64.tar.gz"
@@ -41,25 +41,31 @@ jobs:
           SHA256=$(curl -sL "$BINARY_URL" | sha256sum | cut -d' ' -f1)
           echo "BINARY_SHA256=${SHA256}" >> $GITHUB_OUTPUT
 
+      - name: Calculate SHA256 for ARM64 binary archive
+        id: binary_arm64_sha
+        run: |
+          BINARY_ARM64_URL="https://github.com/petems/gitsweeper/releases/download/${{ steps.release.outputs.VERSION }}/gitsweeper-${{ steps.release.outputs.VERSION }}-darwin-arm64.tar.gz"
+          SHA256=$(curl -sL "$BINARY_ARM64_URL" | sha256sum | cut -d' ' -f1)
+          echo "BINARY_ARM64_SHA256=${SHA256}" >> $GITHUB_OUTPUT
+
       - name: Update Homebrew formula
         run: |
           # Update the formula file with new version and SHA256
           sed -i "s/v[0-9]\+\.[0-9]\+\.[0-9]\+/${{ steps.release.outputs.VERSION }}/g" Formula/gitsweeper.rb
           sed -i "s/PLACEHOLDER_SOURCE_SHA256/${{ steps.source_sha.outputs.SOURCE_SHA256 }}/g" Formula/gitsweeper.rb
           sed -i "s/PLACEHOLDER_BINARY_SHA256/${{ steps.binary_sha.outputs.BINARY_SHA256 }}/g" Formula/gitsweeper.rb
+          sed -i "s/PLACEHOLDER_BINARY_ARM64_SHA256/${{ steps.binary_arm64_sha.outputs.BINARY_ARM64_SHA256 }}/g" Formula/gitsweeper.rb
 
       - name: Create Pull Request to Homebrew Tap
         env:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
-          # This step would typically push to a separate homebrew-gitsweeper repository
-          # For now, we'll just display what would be done
+          # The formula is now maintained in the main repository under Formula/gitsweeper.rb
           echo "Formula updated for version ${{ steps.release.outputs.VERSION }}"
           echo "Source SHA256: ${{ steps.source_sha.outputs.SOURCE_SHA256 }}"
-          echo "Binary SHA256: ${{ steps.binary_sha.outputs.BINARY_SHA256 }}"
+          echo "Intel Binary SHA256: ${{ steps.binary_sha.outputs.BINARY_SHA256 }}"
+          echo "ARM64 Binary SHA256: ${{ steps.binary_arm64_sha.outputs.BINARY_ARM64_SHA256 }}"
           echo ""
-          echo "To complete Homebrew tap setup:"
-          echo "1. Create a new repository: petems/homebrew-gitsweeper"
-          echo "2. Copy Formula/gitsweeper.rb to that repository"
-          echo "3. Set up HOMEBREW_TAP_TOKEN secret with appropriate permissions"
-          echo "4. Users can then install with: brew tap petems/gitsweeper && brew install gitsweeper"
+          echo "Homebrew formula has been updated in Formula/gitsweeper.rb"
+          echo "Users can install with: brew install --formula Formula/gitsweeper.rb"
+          echo "Or create a tap repository if you prefer: brew tap petems/gitsweeper && brew install gitsweeper"

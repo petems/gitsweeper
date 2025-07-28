@@ -17,7 +17,10 @@
 ### VisualStudioCode ###
 .vscode/*
 
-gitsweeper*
+# Built binaries (exclude but allow Formula/gitsweeper.rb)
+gitsweeper
+gitsweeper-*
+!Formula/gitsweeper.rb
 
 bin/*
 tmp/*
