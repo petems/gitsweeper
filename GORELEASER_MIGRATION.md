@@ -4,7 +4,7 @@
 
 ### 1. Added `.goreleaser.yml` Configuration
 - **Builds**: Multi-platform builds (linux, windows, darwin) with amd64/arm64 support
-- **Archives**: Three build variants (standard, optimized, ultra) with proper naming
+- **Archives**: Single optimized build with proper naming
 - **Homebrew**: Automatic formula updates to `petems/homebrew-gitsweeper` repository
 - **Checksums**: Automatic SHA256 checksum generation
 - **Changelog**: Automatic changelog generation from git commits
@@ -71,10 +71,9 @@ git push origin v1.0.0
 
 ## Configuration Details
 
-### Build Variants
-1. **Standard**: Full-featured build with all dependencies
-2. **Optimized**: Smaller binary with stripped symbols and optimized algorithms  
-3. **Ultra**: Minimal binary with standard library only, fastest performance
+### Build Configuration
+- **Single optimized build**: Stripped symbols, optimized for size and performance
+- **Multi-platform support**: Linux, macOS, and Windows with amd64/arm64 architectures
 
 ### Platforms Supported
 - Linux (amd64, arm64)

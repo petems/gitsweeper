@@ -20,36 +20,12 @@ builds:
     ldflags:
       - -s -w -X main.gitCommit={{.Commit}}
     binary: gitsweeper
-    hooks:
-      post:
-        - cmd: go build -tags optimized -ldflags "-s -w -X main.gitCommit={{.Commit}}" -o {{.Path}}-optimized .
-        - cmd: go build -tags ultra -ldflags "-s -w -X main.gitCommit={{.Commit}}" -o {{.Path}}-ultra .
+
 
 archives:
-  - id: standard
-    format: tar.gz
+  - format: tar.gz
     name_template: >-
       {{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}
-    files:
-      - README.md
-      - LICENSE.md
-    format_overrides:
-      - goos: windows
-        format: zip
-  - id: optimized
-    format: tar.gz
-    name_template: >-
-      {{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}-optimized
-    files:
-      - README.md
-      - LICENSE.md
-    format_overrides:
-      - goos: windows
-        format: zip
-  - id: ultra
-    format: tar.gz
-    name_template: >-
-      {{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}-ultra
     files:
       - README.md
       - LICENSE.md
