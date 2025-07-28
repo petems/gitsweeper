@@ -7,28 +7,19 @@ VERSION := $(shell grep "const Version " main.go | sed -E 's/.*"(.+)"$$/\1/')
 .PHONY: all
 all: clean build fmt lint test install
 
-.PHONY: clean build build-optimized build-ultra-optimized size-comparison
+.PHONY: clean build size-comparison
 build:
-	@echo "building ${NAME} ${VERSION}"
+	@echo "building ${NAME} ${VERSION} (ultra-optimized)"
 	@echo "GOPATH=${GOPATH}"
-	go build -ldflags "-X main.gitCommit=${GIT_COMMIT}" -o bin/${NAME}
+	CGO_ENABLED=0 go build -ldflags="-s -w -X main.gitCommit=${GIT_COMMIT}" -trimpath -a -installsuffix cgo -o bin/${NAME}
 
-build-optimized:
-	@echo "building optimized ${NAME} ${VERSION}"
+# Legacy compatibility builds (deprecated)
+build-legacy:
+	@echo "building legacy ${NAME} ${VERSION}"
 	@echo "GOPATH=${GOPATH}"
-	go build -tags optimized -ldflags="-s -w -X main.gitCommit=${GIT_COMMIT}" -trimpath -o bin/${NAME}-optimized
+	go build -ldflags "-X main.gitCommit=${GIT_COMMIT}" -o bin/${NAME}-legacy
 
-build-ultra-optimized:
-	@echo "building ultra-optimized ${NAME} ${VERSION}"
-	@echo "GOPATH=${GOPATH}"
-	CGO_ENABLED=0 go build -tags optimized -ldflags="-s -w -X main.gitCommit=${GIT_COMMIT}" -trimpath -a -installsuffix cgo -o bin/${NAME}-ultra
-
-build-ultra-no-deps:
-	@echo "building ultra-optimized no-deps ${NAME} ${VERSION}"
-	@echo "GOPATH=${GOPATH}"
-	CGO_ENABLED=0 go build -tags ultra -ldflags="-s -w -X main.gitCommit=${GIT_COMMIT}" -trimpath -a -installsuffix cgo -o bin/${NAME}-ultra-nodeps
-
-size-comparison: build build-optimized build-ultra-optimized build-ultra-no-deps
+size-comparison: build build-legacy
 	@echo "Binary size comparison:"
 	@ls -lh bin/${NAME}* | awk '{print $$9 " - " $$5}' | sort
 
