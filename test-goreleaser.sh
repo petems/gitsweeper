@@ -25,7 +25,7 @@ goreleaser build --snapshot --clean --single-target
 
 echo ""
 echo "📦 Running goreleaser release test (dry run)..."
-goreleaser release --snapshot --clean --skip-publish
+goreleaser release --snapshot --clean --skip publish
 
 echo ""
 echo "✅ goreleaser configuration test passed!"
