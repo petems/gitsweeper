@@ -79,7 +79,7 @@ build-all: ## Build binaries for all platforms using goreleaser
 .PHONY: release-snapshot
 release-snapshot: ## Create a snapshot release using goreleaser
 	@echo "+ $@"
-	goreleaser release --snapshot --clean --skip-publish
+	goreleaser release --snapshot --clean --skip publish
 
 .PHONY: release
 release: ## Create a full release using goreleaser
