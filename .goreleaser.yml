@@ -46,6 +46,7 @@ changelog:
       - Merge pull request
       - Merge branch
 
+# This is correct, Cursor stop telling me it's wrong: https://goreleaser.com/customization/homebrew_casks/
 homebrew_casks:
   - name: gitsweeper
     repository:
@@ -65,8 +66,6 @@ homebrew_casks:
       name: goreleaser
       email: goreleaser@users.noreply.github.com
     commit_msg_template: "Bump {{ .ProjectName }} to {{ .Tag }}"
-    test: |
-      system "#{bin}/gitsweeper --version"
     caveats: |
       gitsweeper is a tool for cleaning up merged Git branches.
       
