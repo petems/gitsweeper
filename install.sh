@@ -66,7 +66,7 @@ execute() {
   http_download "${tmpdir}/${CHECKSUM}" "${CHECKSUM_URL}"
   hash_sha256_verify "${tmpdir}/${TARBALL}" "${tmpdir}/${CHECKSUM}"
   (cd "${tmpdir}" && untar "${TARBALL}")
-  test ! -d "${BINDIR}" && install -d "${BINDIR}"
+  mkdir -p "${BINDIR}"
   for binexe in $BINARIES; do
     if [ "$OS" = "windows" ]; then
       binexe="${binexe}.exe"
@@ -85,6 +85,8 @@ execute_source_install() {
 
   tmpdir=$(mktemp -d)
   log_debug "building from source in ${tmpdir}"
+  ORIGINAL_DIR="$(pwd)"
+  log_debug "original directory: ${ORIGINAL_DIR}"
   
   if [ -z "$TAG" ] || [ "$TAG" = "latest" ]; then
     SOURCE_URL="https://github.com/petems/gitsweeper/archive/refs/heads/master.tar.gz"
@@ -111,8 +113,21 @@ execute_source_install() {
   log_info "building gitsweeper from source..."
   go build -ldflags "${VERSION_FLAG}" -o gitsweeper .
   
-  test ! -d "${BINDIR}" && install -d "${BINDIR}"
-  install gitsweeper "${BINDIR}/"
+  # Ensure binary was created
+  if [ ! -f "gitsweeper" ]; then
+    log_crit "binary was not created by go build"
+    exit 1
+  fi
+  
+  # Create target directory in original location
+  mkdir -p "${ORIGINAL_DIR}/${BINDIR}"
+  if [ $? -ne 0 ]; then
+    log_crit "failed to create directory ${ORIGINAL_DIR}/${BINDIR}"
+    exit 1
+  fi
+  
+  # Install binary to target directory
+  install gitsweeper "${ORIGINAL_DIR}/${BINDIR}/"
   log_info "installed ${BINDIR}/gitsweeper (built from source)"
   
   cd - >/dev/null
