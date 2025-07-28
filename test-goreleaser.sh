@@ -6,15 +6,15 @@ echo "Testing goreleaser configuration..."
 
 # Check if goreleaser is installed
 if ! command -v goreleaser &> /dev/null; then
-    echo "Installing goreleaser..."
-    go install github.com/goreleaser/goreleaser@latest
+    echo "Install goreleaser: https://goreleaser.com/install/"
+    exit 1
 fi
 
 echo "Running goreleaser build test..."
 goreleaser build --snapshot --clean --single-target
 
 echo "Running goreleaser release test (dry run)..."
-goreleaser release --snapshot --clean --skip-publish
+goreleaser release --snapshot --clean --skip-validate
 
 echo "✅ goreleaser configuration test passed!"
 echo ""

@@ -1,3 +1,5 @@
+version: 2
+
 before:
   hooks:
     - go mod tidy
@@ -23,8 +25,7 @@ builds:
 
 
 archives:
-  - format: tar.gz
-    name_template: >-
+  - name_template: >-
       {{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}
     files:
       - README.md
@@ -36,8 +37,7 @@ archives:
 checksum:
   name_template: 'checksums.txt'
 
-snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+
 
 changelog:
   sort: asc
@@ -49,26 +49,4 @@ changelog:
       - Merge pull request
       - Merge branch
 
-brews:
-  - name: gitsweeper
-    repository:
-      owner: petems
-      name: homebrew-gitsweeper
-      branch: master
-    homepage: "https://github.com/petems/gitsweeper"
-    description: "A command-line tool for cleaning up merged Git branches"
-    license: "MIT"
-    url_template: "https://github.com/petems/gitsweeper/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-    commit_author:
-      name: goreleaser
-      email: goreleaser@users.noreply.github.com
-    commit_msg_template: "Bump {{ .ProjectName }} to {{ .Tag }}"
-    dependencies:
-      - go
-    conflicts:
-      - git-sweep
-    caveats: |
-      gitsweeper is a tool for cleaning up merged Git branches.
-      
-      To get started:
-        gitsweeper --help 
+ 
