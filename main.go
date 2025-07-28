@@ -1,4 +1,4 @@
-//go:build !optimized
+//go:build !optimized && !ultra
 
 package main
 
