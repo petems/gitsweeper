@@ -153,7 +153,11 @@ tag_to_version() {
 
 adjust_format() {
   # change format (tar.gz or zip) based on OS
-  true
+  if [ "$OS" = "windows" ]; then
+    FORMAT=zip
+  else
+    FORMAT=tar.gz
+  fi
 }
 
 adjust_os() {
@@ -434,7 +438,7 @@ log_info "found version: ${VERSION} for ${TAG}/${OS}/${ARCH}"
 
 # Archive naming should match GitHub Actions release workflow
 NAME=${PROJECT_NAME}-${VERSION}-${OS}-${ARCH}
-FORMAT=tar.gz
+# FORMAT is set by adjust_format() based on OS
 TARBALL=${NAME}.${FORMAT}
 TARBALL_URL=${GITHUB_DOWNLOAD}/${TAG}/${TARBALL}
 CHECKSUM=checksums.txt
