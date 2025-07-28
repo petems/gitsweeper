@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env sh
 set -e
 
 usage() {
@@ -60,7 +60,20 @@ execute() {
     return
   fi
 
-  tmpdir=$(mktemp -d)
+  # Create temporary directory with fallback for systems without mktemp
+  if command -v mktemp >/dev/null 2>&1; then
+    tmpdir=$(mktemp -d)
+  else
+    # Fallback for systems without mktemp
+    if [ "$OS" = "windows" ]; then
+      # Windows temp directory
+      tmpdir="${TEMP:-${TMP:-/tmp}}/gitsweeper-install-$$"
+    else
+      # Unix temp directory
+      tmpdir="/tmp/gitsweeper-install-$$"
+    fi
+    mkdir -p "$tmpdir"
+  fi
   log_debug "downloading files into ${tmpdir}"
   http_download "${tmpdir}/${TARBALL}" "${TARBALL_URL}"
   http_download "${tmpdir}/${CHECKSUM}" "${CHECKSUM_URL}"
@@ -71,7 +84,13 @@ execute() {
     if [ "$OS" = "windows" ]; then
       binexe="${binexe}.exe"
     fi
-    install "${tmpdir}/${binexe}" "${BINDIR}/"
+    # Use install command if available, otherwise use cp
+    if command -v install >/dev/null 2>&1; then
+      install "${tmpdir}/${binexe}" "${BINDIR}/"
+    else
+      cp "${tmpdir}/${binexe}" "${BINDIR}/"
+      chmod +x "${BINDIR}/${binexe}"
+    fi
     log_info "installed ${BINDIR}/${binexe}"
   done
   rm -rf "${tmpdir}"
@@ -83,7 +102,20 @@ execute_source_install() {
     exit 1
   fi
 
-  tmpdir=$(mktemp -d)
+  # Create temporary directory with fallback for systems without mktemp
+  if command -v mktemp >/dev/null 2>&1; then
+    tmpdir=$(mktemp -d)
+  else
+    # Fallback for systems without mktemp
+    if [ "$OS" = "windows" ]; then
+      # Windows temp directory
+      tmpdir="${TEMP:-${TMP:-/tmp}}/gitsweeper-install-$$"
+    else
+      # Unix temp directory
+      tmpdir="/tmp/gitsweeper-install-$$"
+    fi
+    mkdir -p "$tmpdir"
+  fi
   log_debug "building from source in ${tmpdir}"
   ORIGINAL_DIR="$(pwd)"
   log_debug "original directory: ${ORIGINAL_DIR}"
@@ -99,7 +131,13 @@ execute_source_install() {
   fi
 
   http_download "${tmpdir}/source.tar.gz" "$SOURCE_URL"
-  (cd "${tmpdir}" && tar -xzf source.tar.gz)
+  (cd "${tmpdir}" && untar source.tar.gz)
+  
+  # Verify source directory exists
+  if [ ! -d "${tmpdir}/${SOURCE_DIR}" ]; then
+    log_crit "source directory ${SOURCE_DIR} was not created after extraction"
+    exit 1
+  fi
   
   cd "${tmpdir}/${SOURCE_DIR}"
   
@@ -127,10 +165,16 @@ execute_source_install() {
   fi
   
   # Install binary to target directory
-  install gitsweeper "${ORIGINAL_DIR}/${BINDIR}/"
+  if command -v install >/dev/null 2>&1; then
+    install gitsweeper "${ORIGINAL_DIR}/${BINDIR}/"
+  else
+    cp gitsweeper "${ORIGINAL_DIR}/${BINDIR}/"
+    chmod +x "${ORIGINAL_DIR}/${BINDIR}/gitsweeper"
+  fi
   log_info "installed ${BINDIR}/gitsweeper (built from source)"
   
-  cd - >/dev/null
+  # Return to original directory (portable way)
+  cd "${ORIGINAL_DIR}"
   rm -rf "${tmpdir}"
 }
 
@@ -249,6 +293,13 @@ uname_os() {
     cygwin_nt*) os="windows" ;;
     mingw*) os="windows" ;;
     msys_nt*) os="windows" ;;
+    msys*) os="windows" ;;
+    # Handle Windows Subsystem for Linux (WSL)
+    linux*)
+      if [ -f /proc/version ] && grep -q Microsoft /proc/version 2>/dev/null; then
+        os="windows"
+      fi
+      ;;
   esac
   echo "$os"
 }
@@ -308,9 +359,29 @@ uname_arch_check() {
 untar() {
   tarball=$1
   case "${tarball}" in
-    *.tar.gz | *.tgz) tar --no-same-owner -xzf "${tarball}" ;;
-    *.tar) tar --no-same-owner -xf "${tarball}" ;;
-    *.zip) unzip -q "${tarball}" ;;
+    *.tar.gz | *.tgz) 
+      # Use portable tar options
+      if tar --help 2>&1 | grep -q "no-same-owner"; then
+        tar --no-same-owner -xzf "${tarball}"
+      else
+        tar -xzf "${tarball}"
+      fi
+      ;;
+    *.tar) 
+      if tar --help 2>&1 | grep -q "no-same-owner"; then
+        tar --no-same-owner -xf "${tarball}"
+      else
+        tar -xf "${tarball}"
+      fi
+      ;;
+    *.zip) 
+      if command -v unzip >/dev/null 2>&1; then
+        unzip -q "${tarball}"
+      else
+        log_err "unzip command not found, cannot extract ${tarball}"
+        return 1
+      fi
+      ;;
     *)
       log_err "untar unknown archive format for ${tarball}"
       return 1
@@ -355,7 +426,18 @@ http_download() {
   return 1
 }
 http_copy() {
-  tmp=$(mktemp)
+  # Create temporary file with fallback
+  if command -v mktemp >/dev/null 2>&1; then
+    tmp=$(mktemp)
+  else
+    if [ "$OS" = "windows" ]; then
+      # Windows temp directory
+      tmp="${TEMP:-${TMP:-/tmp}}/gitsweeper-http-$$"
+    else
+      # Unix temp directory
+      tmp="/tmp/gitsweeper-http-$$"
+    fi
+  fi
   http_download "${tmp}" "$1" "$2" || return 1
   body=$(cat "$tmp")
   rm -f "${tmp}"
