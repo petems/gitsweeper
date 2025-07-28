@@ -1,6 +1,7 @@
 # Setup name variables for the package/tool
 NAME := gitsweeper
 PKG := github.com/petems/$(NAME)
+LINT := golangci-lint
 GIT_COMMIT := $(shell git log -1 --pretty=format:"%h" .)
 VERSION := $(shell grep "const Version " main.go | sed -E 's/.*"(.+)"$$/\1/')
 
@@ -28,10 +29,15 @@ fmt: ## Verifies all files have men `gofmt`ed
 	@echo "+ $@"
 	@gofmt -s -l . | grep -v '.pb.go:' | grep -v vendor | tee /dev/stderr
 
-.PHONY: lint
-lint: ## Verifies `golint` passes
-	@echo "+ $@"
-	@golangci-lint run ./... | tee /dev/stderr
+## Run linter
+lint:
+	@echo "Checking golangci-lint version..."
+	@$(LINT) version | grep -q "golangci-lint has version" || (echo "golangci-lint not found. Please install it first." && exit 1)
+	@$(LINT) version | grep -oE "version [0-9]+\.[0-9]+\.[0-9]+" | cut -d' ' -f2 | awk -F. '{if ($$1 > 2 || ($$1 == 2 && $$2 >= 3)) exit 0; else exit 1}' || (echo "golangci-lint version 2.3.0 or higher required. Current version:" && $(LINT) version && exit 1)
+	$(LINT) run
+
+lint-fix:
+	$(LINT) run --fix
 
 .PHONY: cover
 cover: ## Runs go test with coverage
