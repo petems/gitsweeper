@@ -28,7 +28,38 @@ These branches have been merged into master:
 
 ## Installation
 
-### Pre-built Binaries (Recommended)
+### Quick Install (Recommended)
+
+Use our install script for the easiest installation:
+
+```bash
+# Install latest version
+curl -sSfL https://raw.githubusercontent.com/petems/gitsweeper/master/install.sh | sh
+
+# Install specific version
+curl -sSfL https://raw.githubusercontent.com/petems/gitsweeper/master/install.sh | sh -s v0.1.0
+
+# Install to custom location
+curl -sSfL https://raw.githubusercontent.com/petems/gitsweeper/master/install.sh | sh -s -- -b /usr/local/bin
+
+# Force build from source (requires Go)
+curl -sSfL https://raw.githubusercontent.com/petems/gitsweeper/master/install.sh | sh -s -- -f
+```
+
+### Homebrew (macOS)
+
+```bash
+# Add the tap
+brew tap petems/gitsweeper
+
+# Install gitsweeper
+brew install gitsweeper
+
+# Or force compilation from source
+brew install --build-from-source gitsweeper
+```
+
+### Pre-built Binaries
 
 Download the latest release for your platform from the [GitHub releases page](https://github.com/petems/gitsweeper/releases):
 
@@ -38,7 +69,7 @@ Download the latest release for your platform from the [GitHub releases page](ht
 - **macOS (Apple Silicon)**: `gitsweeper-vX.Y.Z-darwin-arm64.tar.gz`
 - **Windows (x86_64)**: `gitsweeper-vX.Y.Z-windows-amd64.zip`
 
-#### Installation Steps:
+#### Manual Installation Steps:
 
 1. Download the appropriate archive for your platform
 2. Extract the archive:
@@ -62,6 +93,18 @@ Download the latest release for your platform from the [GitHub releases page](ht
 
 ```bash
 go install github.com/petems/gitsweeper@latest
+```
+
+### Development Environment
+
+If you're contributing to gitsweeper, you can set up a development environment using Homebrew:
+
+```bash
+# Install all development dependencies
+brew bundle
+
+# Build and test
+make
 ```
 
 ## Background

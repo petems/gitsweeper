@@ -44,6 +44,11 @@ test: ## Runs the go tests
 	@echo "+ $@"
 	@go test ./...
 
+.PHONY: cucumber
+cucumber: ## Runs the cucumber integration tests
+	@echo "+ $@"
+	bundle exec cucumber
+
 .PHONY: install
 install: ## Installs the executable or package
 	@echo "+ $@"
