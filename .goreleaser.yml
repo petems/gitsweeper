@@ -48,10 +48,18 @@ changelog:
 
 homebrew_casks:
   - name: gitsweeper
+    conflicts:
+      - formula: gitsweeper
     repository:
       owner: petems
       name: homebrew-gitsweeper
       branch: master
+      # Create a Github Finegrained Access Token
+      # https://github.com/settings/personal-access-tokens
+      # Set the scope to just the petems/homebrew-gitsweeper repo, with pull-request write permissions
+      # Open https://github.com/petems/gitsweeper/settings/secrets/actions
+      # Create a new secret called HOMEBREW_TOKEN with the value of the token you created
+      token: "{{.Env.HOMEBREW_TOKEN}}"
     homepage: "https://github.com/petems/gitsweeper"
     description: "A command-line tool for cleaning up merged Git branches"
     license: "MIT"
