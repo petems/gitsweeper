@@ -1,0 +1,98 @@
+before:
+  hooks:
+    - go mod tidy
+    - go mod verify
+
+builds:
+  - id: gitsweeper
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w -X main.gitCommit={{.Commit}}
+    binary: gitsweeper
+    hooks:
+      post:
+        - cmd: go build -tags optimized -ldflags "-s -w -X main.gitCommit={{.Commit}}" -o {{.Path}}-optimized .
+        - cmd: go build -tags ultra -ldflags "-s -w -X main.gitCommit={{.Commit}}" -o {{.Path}}-ultra .
+
+archives:
+  - id: standard
+    format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}
+    files:
+      - README.md
+      - LICENSE.md
+    format_overrides:
+      - goos: windows
+        format: zip
+  - id: optimized
+    format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}-optimized
+    files:
+      - README.md
+      - LICENSE.md
+    format_overrides:
+      - goos: windows
+        format: zip
+  - id: ultra
+    format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}-ultra
+    files:
+      - README.md
+      - LICENSE.md
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - Merge pull request
+      - Merge branch
+
+brews:
+  - name: gitsweeper
+    repository:
+      owner: petems
+      name: homebrew-gitsweeper
+      branch: master
+    homepage: "https://github.com/petems/gitsweeper"
+    description: "A command-line tool for cleaning up merged Git branches"
+    license: "MIT"
+    url_template: "https://github.com/petems/gitsweeper/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    commit_author:
+      name: goreleaser
+      email: goreleaser@users.noreply.github.com
+    commit_msg_template: "Bump {{ .ProjectName }} to {{ .Tag }}"
+    dependencies:
+      - go
+    conflicts:
+      - git-sweep
+    caveats: |
+      gitsweeper is a tool for cleaning up merged Git branches.
+      
+      To get started:
+        gitsweeper --help 

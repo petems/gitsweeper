@@ -71,21 +71,17 @@ install: ## Installs the executable or package
 	go install -a .
 
 .PHONY: build-all
-build-all: ## Build binaries for all platforms
+build-all: ## Build binaries for all platforms using goreleaser
 	@echo "+ $@"
 	@echo "building ${NAME} ${VERSION} for multiple platforms"
-	GOOS=linux GOARCH=amd64 go build -ldflags "-X main.gitCommit=${GIT_COMMIT}" -o bin/${NAME}-linux-amd64
-	GOOS=linux GOARCH=arm64 go build -ldflags "-X main.gitCommit=${GIT_COMMIT}" -o bin/${NAME}-linux-arm64
-	GOOS=darwin GOARCH=amd64 go build -ldflags "-X main.gitCommit=${GIT_COMMIT}" -o bin/${NAME}-darwin-amd64
-	GOOS=darwin GOARCH=arm64 go build -ldflags "-X main.gitCommit=${GIT_COMMIT}" -o bin/${NAME}-darwin-arm64
-	GOOS=windows GOARCH=amd64 go build -ldflags "-X main.gitCommit=${GIT_COMMIT}" -o bin/${NAME}-windows-amd64.exe
+	goreleaser build --snapshot --clean --single-target
 
-.PHONY: release-archives
-release-archives: build-all ## Create release archives for all platforms
+.PHONY: release-snapshot
+release-snapshot: ## Create a snapshot release using goreleaser
 	@echo "+ $@"
-	@mkdir -p dist
-	tar -czf dist/${NAME}-${VERSION}-linux-amd64.tar.gz -C bin ${NAME}-linux-amd64 -C .. README.md
-	tar -czf dist/${NAME}-${VERSION}-linux-arm64.tar.gz -C bin ${NAME}-linux-arm64 -C .. README.md
-	tar -czf dist/${NAME}-${VERSION}-darwin-amd64.tar.gz -C bin ${NAME}-darwin-amd64 -C .. README.md
-	tar -czf dist/${NAME}-${VERSION}-darwin-arm64.tar.gz -C bin ${NAME}-darwin-arm64 -C .. README.md
-	cd bin && zip ../dist/${NAME}-${VERSION}-windows-amd64.zip ${NAME}-windows-amd64.exe ../README.md
+	goreleaser release --snapshot --clean --skip-publish
+
+.PHONY: release
+release: ## Create a full release using goreleaser
+	@echo "+ $@"
+	goreleaser release --clean
