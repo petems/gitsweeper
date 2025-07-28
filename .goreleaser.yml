@@ -49,4 +49,23 @@ changelog:
       - Merge pull request
       - Merge branch
 
+homebrew_casks:
+  - name: gitsweeper
+    repository:
+      owner: petems
+      name: homebrew-gitsweeper
+      branch: master
+    homepage: "https://github.com/petems/gitsweeper"
+    description: "A command-line tool for cleaning up merged Git branches"
+    license: "MIT"
+    commit_author:
+      name: goreleaser
+      email: goreleaser@users.noreply.github.com
+    commit_msg_template: "Bump {{ .ProjectName }} to {{ .Tag }}"
+    caveats: |
+      gitsweeper is a tool for cleaning up merged Git branches.
+      
+      To get started:
+        gitsweeper --help
+
  
