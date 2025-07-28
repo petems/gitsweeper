@@ -48,15 +48,32 @@ changelog:
 # This is correct, Cursor stop telling me it's wrong: https://goreleaser.com/customization/homebrew_casks/
 homebrew_casks:
   - name: gitsweeper
+    custom_block: |
+      head "https://github.com/petems/gitsweeper.git", branch: "master"
+    hooks:
+      post:
+        # until Apple takes my money so I can properly sign, remove the quarantine: https://goreleaser.com/customization/homebrew_casks/#signing-and-notarizing
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/gitsweeper"]
+          end
     repository:
       owner: petems
       name: homebrew-gitsweeper
       branch: master
       # Create a Github Finegrained Access Token
       # https://github.com/settings/personal-access-tokens
-      # Set the scope to just the petems/homebrew-gitsweeper repo, with pull-request write permissions
+      # Set the scope to both the petems/homebrew-gitsweeper and the petems/gitsweeper repo
+      # Add the following perms:
+      # Actions: Read and write
+      # Commit statuses: Read and write
+      # Contents: Read and write
+      # Deployments: Read and write
+      # Environments: Read-only
+      # Secrets: Read-only
+      # Variables: Read-only
       # Open https://github.com/petems/gitsweeper/settings/secrets/actions
-      # Create a new secret called HOMEBREW_TOKEN with the value of the token you created
+      # Create a new secret called GITHUB_TOKEN with the value of the token you created
       token: "{{.Env.GITHUB_TOKEN}}"
     homepage: "https://github.com/petems/gitsweeper"
     description: "A command-line tool for cleaning up merged Git branches"
@@ -67,7 +84,6 @@ homebrew_casks:
     commit_msg_template: "Bump {{ .ProjectName }} to {{ .Tag }}"
     caveats: |
       gitsweeper is a tool for cleaning up merged Git branches.
-      
       To get started:
         gitsweeper --help
 
