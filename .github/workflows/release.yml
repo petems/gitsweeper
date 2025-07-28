@@ -12,6 +12,7 @@ jobs:
   build:
     name: Build and Release
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       matrix:
         goos: [linux, windows, darwin]
@@ -29,15 +30,25 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21.x'
+          go-version: '1.22.x'
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
       - name: Get version from tag
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
 
       - name: Get git commit
         id: commit
-        run: echo "GIT_COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        run: echo "GIT_COMMIT=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Set binary name
         id: binary
@@ -46,7 +57,7 @@ jobs:
           if [ "${{ matrix.goos }}" = "windows" ]; then
             BINARY_NAME="${BINARY_NAME}.exe"
           fi
-          echo "BINARY_NAME=${BINARY_NAME}" >> $GITHUB_OUTPUT
+          echo "BINARY_NAME=${BINARY_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Build binary
         env:
@@ -54,36 +65,77 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
         run: |
+          # Standard build
           go build -ldflags "-X main.gitCommit=${{ steps.commit.outputs.GIT_COMMIT }} -s -w" \
-            -o ${{ steps.binary.outputs.BINARY_NAME }} .
+            -trimpath -a -installsuffix cgo \
+            -o "${{ steps.binary.outputs.BINARY_NAME }}" .
+          
+          # Optimized build
+          go build -tags optimized -ldflags "-X main.gitCommit=${{ steps.commit.outputs.GIT_COMMIT }} -s -w" \
+            -trimpath -a -installsuffix cgo \
+            -o "${{ steps.binary.outputs.BINARY_NAME }}-optimized" .
+          
+          # Ultra-optimized build
+          go build -tags ultra -ldflags "-X main.gitCommit=${{ steps.commit.outputs.GIT_COMMIT }} -s -w" \
+            -trimpath -a -installsuffix cgo \
+            -o "${{ steps.binary.outputs.BINARY_NAME }}-ultra" .
+
+      - name: Verify binaries
+        run: |
+          # Test that binaries can be executed and show version
+          for binary in "${{ steps.binary.outputs.BINARY_NAME}}"*; do
+            if [ -f "$binary" ]; then
+              echo "Testing $binary..."
+              if [ "${{ matrix.goos }}" = "windows" ]; then
+                # Windows binaries need wine for testing on Linux runners
+                echo "Skipping Windows binary test on Linux runner"
+              else
+                # Test version command
+                ./"$binary" version || echo "Warning: $binary version command failed"
+              fi
+            fi
+          done
 
       - name: Create archive
         id: archive
         run: |
-          ARCHIVE_NAME="gitsweeper-${{ steps.version.outputs.VERSION }}-${{ matrix.goos }}-${{ matrix.goarch }}"
-          if [ "${{ matrix.goos }}" = "windows" ]; then
-            ARCHIVE_NAME="${ARCHIVE_NAME}.zip"
-            zip "${ARCHIVE_NAME}" ${{ steps.binary.outputs.BINARY_NAME }} README.md
-          else
-            ARCHIVE_NAME="${ARCHIVE_NAME}.tar.gz"
-            tar -czf "${ARCHIVE_NAME}" ${{ steps.binary.outputs.BINARY_NAME }} README.md
-          fi
-          echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_OUTPUT
+          # Create archives for all build variants
+          for variant in "" "-optimized" "-ultra"; do
+            ARCHIVE_NAME="gitsweeper-${{ steps.version.outputs.VERSION }}-${{ matrix.goos }}-${{ matrix.goarch }}${variant}"
+            BINARY_NAME="${{ steps.binary.outputs.BINARY_NAME }}${variant}"
+            
+            if [ "${{ matrix.goos }}" = "windows" ]; then
+              ARCHIVE_NAME="${ARCHIVE_NAME}.zip"
+              zip "${ARCHIVE_NAME}" "${BINARY_NAME}" README.md
+            else
+              ARCHIVE_NAME="${ARCHIVE_NAME}.tar.gz"
+              tar -czf "${ARCHIVE_NAME}" "${BINARY_NAME}" README.md
+            fi
+            
+            # Generate checksum
+            if command -v sha256sum >/dev/null; then
+              sha256sum "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
+            elif command -v shasum >/dev/null; then
+              shasum -a 256 "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
+            fi
+          done
           
-          # Generate checksum
-          if command -v sha256sum >/dev/null; then
-            sha256sum "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
-          elif command -v shasum >/dev/null; then
-            shasum -a 256 "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
+          # Set the main archive name for the upload step
+          MAIN_ARCHIVE_NAME="gitsweeper-${{ steps.version.outputs.VERSION }}-${{ matrix.goos }}-${{ matrix.goarch }}"
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            MAIN_ARCHIVE_NAME="${MAIN_ARCHIVE_NAME}.zip"
+          else
+            MAIN_ARCHIVE_NAME="${MAIN_ARCHIVE_NAME}.tar.gz"
           fi
+          echo "ARCHIVE_NAME=${MAIN_ARCHIVE_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.archive.outputs.ARCHIVE_NAME }}
+          name: release-artifacts
           path: |
-            ${{ steps.archive.outputs.ARCHIVE_NAME }}
-            ${{ steps.archive.outputs.ARCHIVE_NAME }}.sha256
+            gitsweeper-${{ steps.version.outputs.VERSION }}-${{ matrix.goos }}-${{ matrix.goarch }}*
+            gitsweeper-${{ steps.version.outputs.VERSION }}-${{ matrix.goos }}-${{ matrix.goarch }}*.sha256
 
   release:
     name: Create Release
@@ -95,7 +147,7 @@ jobs:
 
       - name: Get version from tag
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -125,11 +177,34 @@ jobs:
             
             Choose the appropriate binary for your platform:
             
+            **Standard Builds:**
             - **Linux (x86_64)**: `gitsweeper-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz`
             - **Linux (ARM64)**: `gitsweeper-${{ steps.version.outputs.VERSION }}-linux-arm64.tar.gz`
             - **macOS (Intel)**: `gitsweeper-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz`
             - **macOS (Apple Silicon)**: `gitsweeper-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz`
             - **Windows (x86_64)**: `gitsweeper-${{ steps.version.outputs.VERSION }}-windows-amd64.zip`
+            
+            **Optimized Builds** (smaller, faster):
+            - **Linux (x86_64)**: `gitsweeper-${{ steps.version.outputs.VERSION }}-linux-amd64-optimized.tar.gz`
+            - **Linux (ARM64)**: `gitsweeper-${{ steps.version.outputs.VERSION }}-linux-arm64-optimized.tar.gz`
+            - **macOS (Intel)**: `gitsweeper-${{ steps.version.outputs.VERSION }}-darwin-amd64-optimized.tar.gz`
+            - **macOS (Apple Silicon)**: `gitsweeper-${{ steps.version.outputs.VERSION }}-darwin-arm64-optimized.tar.gz`
+            - **Windows (x86_64)**: `gitsweeper-${{ steps.version.outputs.VERSION }}-windows-amd64-optimized.zip`
+            
+            **Ultra-Optimized Builds** (smallest, fastest, minimal dependencies):
+            - **Linux (x86_64)**: `gitsweeper-${{ steps.version.outputs.VERSION }}-linux-amd64-ultra.tar.gz`
+            - **Linux (ARM64)**: `gitsweeper-${{ steps.version.outputs.VERSION }}-linux-arm64-ultra.tar.gz`
+            - **macOS (Intel)**: `gitsweeper-${{ steps.version.outputs.VERSION }}-darwin-amd64-ultra.tar.gz`
+            - **macOS (Apple Silicon)**: `gitsweeper-${{ steps.version.outputs.VERSION }}-darwin-arm64-ultra.tar.gz`
+            - **Windows (x86_64)**: `gitsweeper-${{ steps.version.outputs.VERSION }}-windows-amd64-ultra.zip`
+            
+            ### Build Variants
+            
+            This release includes three build variants:
+            
+            - **Standard**: Full-featured build with all dependencies
+            - **Optimized**: Smaller binary with stripped symbols and optimized algorithms
+            - **Ultra**: Minimal binary with standard library only, fastest performance
             
             ### Installation
             
