@@ -9,6 +9,9 @@ on:
     paths: [ 'install.sh' ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   validate-workflow:
     name: Validate Workflow
