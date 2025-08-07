@@ -41,6 +41,20 @@ type commitBatch struct {
 	startIdx int
 }
 
+var (
+	commitBatchPool = sync.Pool{
+		New: func() interface{} {
+			return &commitBatch{}
+		},
+	}
+	commitSlicePool = sync.Pool{
+		New: func() interface{} {
+			s := make([]*object.Commit, 0, BatchSize)
+			return &s
+		},
+	}
+)
+
 func RemoteBranches(s storer.ReferenceStorer) (storer.ReferenceIter, error) {
 	refs, err := s.IterReferences()
 	if err != nil {
@@ -330,7 +344,7 @@ func findMergedBranchesConcurrent(
 	}
 
 	// Channel for commit batches
-	commitBatches := make(chan commitBatch, ConcurrentWorkers*2)
+	commitBatches := make(chan *commitBatch, ConcurrentWorkers*2)
 	results := make(chan []string, ConcurrentWorkers)
 
 	// Start worker goroutines
@@ -350,7 +364,7 @@ func findMergedBranchesConcurrent(
 	go func() {
 		defer close(commitBatches)
 
-		var batch []*object.Commit
+		batch := *commitSlicePool.Get().(*[]*object.Commit)
 		commitCount := 0
 		batchStartIdx := 0
 
@@ -372,9 +386,12 @@ func findMergedBranchesConcurrent(
 
 			// Send batch when it's full
 			if len(batch) >= BatchSize {
+				batchToSend := commitBatchPool.Get().(*commitBatch)
+				batchToSend.commits = batch
+				batchToSend.startIdx = batchStartIdx
 				select {
-				case commitBatches <- commitBatch{commits: batch, startIdx: batchStartIdx}:
-					batch = make([]*object.Commit, 0, BatchSize)
+				case commitBatches <- batchToSend:
+					batch = (*commitSlicePool.Get().(*[]*object.Commit))[:0]
 					batchStartIdx = commitCount
 				case <-ctx.Done():
 					return ctx.Err()
@@ -386,10 +403,16 @@ func findMergedBranchesConcurrent(
 
 		// Send remaining commits
 		if len(batch) > 0 && err == nil {
+			batchToSend := commitBatchPool.Get().(*commitBatch)
+			batchToSend.commits = batch
+			batchToSend.startIdx = batchStartIdx
 			select {
-			case commitBatches <- commitBatch{commits: batch, startIdx: batchStartIdx}:
+			case commitBatches <- batchToSend:
 			case <-ctx.Done():
 			}
+		} else {
+			// Return the slice to the pool if not sent
+			commitSlicePool.Put(&batch)
 		}
 	}()
 
@@ -426,7 +449,7 @@ func findMergedBranchesConcurrent(
 // processCommitBatches processes batches of commits in a worker goroutine.
 func processCommitBatches(
 	ctx context.Context,
-	batches <-chan commitBatch,
+	batches <-chan *commitBatch,
 	branchHashMap map[string][]BranchInfo,
 	totalBranches int,
 ) []string {
@@ -437,12 +460,18 @@ func processCommitBatches(
 		// Check context for cancellation
 		select {
 		case <-ctx.Done():
+			// Return batch to pool before exiting
+			commitSlicePool.Put(&batch.commits)
+			commitBatchPool.Put(batch)
 			return mergedBranches
 		default:
 		}
 
 		// Early termination if all branches found
 		if len(foundBranches) >= totalBranches {
+			// Return batch to pool before exiting
+			commitSlicePool.Put(&batch.commits)
+			commitBatchPool.Put(batch)
 			return mergedBranches
 		}
 
@@ -463,6 +492,10 @@ func processCommitBatches(
 				}
 			}
 		}
+
+		// Return batch to pool
+		commitSlicePool.Put(&batch.commits)
+		commitBatchPool.Put(batch)
 	}
 
 	return mergedBranches
