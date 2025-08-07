@@ -41,6 +41,30 @@ type commitBatch struct {
 	startIdx int
 }
 
+var (
+	commitBatchPool = sync.Pool{
+		New: func() interface{} {
+			return &commitBatch{}
+		},
+	}
+)
+
+// repository is an interface that abstracts the git.Repository object.
+type repository interface {
+	Log(opts *git.LogOptions) (object.CommitIter, error)
+	Remotes() ([]*git.Remote, error)
+	Storer() storer.ReferenceStorer
+}
+
+// gitRepository is a wrapper for a git.Repository that implements the repository interface.
+type gitRepository struct {
+	*git.Repository
+}
+
+func (r *gitRepository) Storer() storer.ReferenceStorer {
+	return r.Repository.Storer
+}
+
 func RemoteBranches(s storer.ReferenceStorer) (storer.ReferenceIter, error) {
 	refs, err := s.IterReferences()
 	if err != nil {
@@ -104,13 +128,17 @@ func GetCurrentDirAsGitRepo() (*git.Repository, error) {
 	return repo, nil
 }
 
-// GetMergedBranchesUltra implements ultra-optimized merged branch detection.
+// GetMergedBranches is the main entry point for the logic.
 func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]string, error) {
 	repo, err := GetCurrentDirAsGitRepo()
 	if err != nil {
 		return nil, err
 	}
+	return getMergedBranches(&gitRepository{repo}, remoteOrigin, masterBranchName, skipBranches)
+}
 
+// getMergedBranches implements the core logic for finding merged branches.
+func getMergedBranches(repo repository, remoteOrigin, masterBranchName, skipBranches string) ([]string, error) {
 	// Convert skip branches to a set for O(1) lookups
 	var skipSet map[string]bool
 	if skipBranches != "" {
@@ -122,7 +150,7 @@ func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]s
 	LogInfo("Attempting to get master information from branches from repo")
 
 	// Get branch heads efficiently
-	branchHeads, err := getBranchHeadsOptimized(repo)
+	branchHeads, err := getBranchHeadsOptimized(repo.Storer())
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +185,7 @@ func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]s
 	}
 
 	// Get remote branches efficiently
-	remoteBranches, err := getRemoteBranchesOptimized(repo, remoteOrigin, skipSet)
+	remoteBranches, err := getRemoteBranchesOptimized(repo.Storer(), remoteOrigin, skipSet)
 	if err != nil {
 		return nil, err
 	}
@@ -180,8 +208,8 @@ func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]s
 }
 
 // getBranchHeadsOptimized efficiently gets all branch heads.
-func getBranchHeadsOptimized(repo *git.Repository) (map[string]plumbing.Hash, error) {
-	branchRefs, err := repo.Branches()
+func getBranchHeadsOptimized(s storer.ReferenceStorer) (map[string]plumbing.Hash, error) {
+	branchRefs, err := s.IterReferences()
 	if err != nil {
 		return nil, fmt.Errorf("list branches failed: %w", err)
 	}
@@ -189,8 +217,10 @@ func getBranchHeadsOptimized(repo *git.Repository) (map[string]plumbing.Hash, er
 	branchHeads := make(map[string]plumbing.Hash)
 
 	err = branchRefs.ForEach(func(reference *plumbing.Reference) error {
-		branchName := strings.TrimPrefix(reference.Name().String(), "refs/heads/")
-		branchHeads[branchName] = reference.Hash()
+		if reference.Name().IsBranch() {
+			branchName := strings.TrimPrefix(reference.Name().String(), "refs/heads/")
+			branchHeads[branchName] = reference.Hash()
+		}
 		return nil
 	})
 
@@ -203,11 +233,11 @@ func getBranchHeadsOptimized(repo *git.Repository) (map[string]plumbing.Hash, er
 
 // getRemoteBranchesOptimized efficiently gets remote branches with filtering.
 func getRemoteBranchesOptimized(
-	repo *git.Repository,
+	s storer.ReferenceStorer,
 	remoteOrigin string,
 	skipSet map[string]bool,
 ) ([]BranchInfo, error) {
-	remoteBranches, err := RemoteBranches(repo.Storer)
+	remoteBranches, err := RemoteBranches(s)
 	if err != nil {
 		return nil, fmt.Errorf("list remote branches failed: %w", err)
 	}
@@ -330,7 +360,7 @@ func findMergedBranchesConcurrent(
 	}
 
 	// Channel for commit batches
-	commitBatches := make(chan commitBatch, ConcurrentWorkers*2)
+	commitBatches := make(chan *commitBatch, ConcurrentWorkers*2)
 	results := make(chan []string, ConcurrentWorkers)
 
 	// Start worker goroutines
@@ -372,8 +402,11 @@ func findMergedBranchesConcurrent(
 
 			// Send batch when it's full
 			if len(batch) >= BatchSize {
+				batchToSend := commitBatchPool.Get().(*commitBatch)
+				batchToSend.commits = batch
+				batchToSend.startIdx = batchStartIdx
 				select {
-				case commitBatches <- commitBatch{commits: batch, startIdx: batchStartIdx}:
+				case commitBatches <- batchToSend:
 					batch = make([]*object.Commit, 0, BatchSize)
 					batchStartIdx = commitCount
 				case <-ctx.Done():
@@ -386,8 +419,11 @@ func findMergedBranchesConcurrent(
 
 		// Send remaining commits
 		if len(batch) > 0 && err == nil {
+			batchToSend := commitBatchPool.Get().(*commitBatch)
+			batchToSend.commits = batch
+			batchToSend.startIdx = batchStartIdx
 			select {
-			case commitBatches <- commitBatch{commits: batch, startIdx: batchStartIdx}:
+			case commitBatches <- batchToSend:
 			case <-ctx.Done():
 			}
 		}
@@ -426,7 +462,7 @@ func findMergedBranchesConcurrent(
 // processCommitBatches processes batches of commits in a worker goroutine.
 func processCommitBatches(
 	ctx context.Context,
-	batches <-chan commitBatch,
+	batches <-chan *commitBatch,
 	branchHashMap map[string][]BranchInfo,
 	totalBranches int,
 ) []string {
@@ -437,12 +473,16 @@ func processCommitBatches(
 		// Check context for cancellation
 		select {
 		case <-ctx.Done():
+			// Return batch to pool before exiting
+			commitBatchPool.Put(batch)
 			return mergedBranches
 		default:
 		}
 
 		// Early termination if all branches found
 		if len(foundBranches) >= totalBranches {
+			// Return batch to pool before exiting
+			commitBatchPool.Put(batch)
 			return mergedBranches
 		}
 
@@ -463,6 +503,9 @@ func processCommitBatches(
 				}
 			}
 		}
+
+		// Return batch to pool
+		commitBatchPool.Put(batch)
 	}
 
 	return mergedBranches
