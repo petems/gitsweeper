@@ -1,6 +1,9 @@
 package internal
 
-import "sort"
+import (
+	"sort"
+	"strings"
+)
 
 // IsStringInSlice checks if a string is present in a slice of strings
 // Optimized version that uses binary search for sorted slices
@@ -53,7 +56,11 @@ func binarySearchString(target string, list []string) bool {
 func StringSliceToSet(slice []string) map[string]bool {
 	set := make(map[string]bool, len(slice))
 	for _, s := range slice {
-		set[s] = true
+		trimmed := strings.TrimSpace(s)
+		if trimmed == "" {
+			continue
+		}
+		set[trimmed] = true
 	}
 	return set
 }

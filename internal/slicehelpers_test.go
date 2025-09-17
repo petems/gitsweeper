@@ -81,6 +81,19 @@ func TestStringSliceToSet(t *testing.T) {
 	assert.Len(t, set, 3) // duplicates removed
 }
 
+func TestStringSliceToSetTrimsWhitespace(t *testing.T) {
+	slice := []string{" feature/foo", "bar ", "  baz  ", ""}
+	set := StringSliceToSet(slice)
+
+	assert.True(t, set["feature/foo"])
+	assert.True(t, set["bar"])
+	assert.True(t, set["baz"])
+	assert.False(t, set[" feature/foo"])
+	assert.False(t, set["bar "])
+	assert.False(t, set["  baz  "])
+	assert.Len(t, set, 3)
+}
+
 func TestIsStringInSet(t *testing.T) {
 	set := map[string]bool{
 		"apple":  true,
