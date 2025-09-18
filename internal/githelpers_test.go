@@ -38,20 +38,71 @@ func TestParseBranchname_ThreeSlashes(t *testing.T) {
 	assert.Equal(t, "janedoe/cool-branch-name/and-another-branch-after/one-more-for-luck", branchShort)
 }
 
-func TestGetRemoteBranchesOptimizedSkipsCustomMaster(t *testing.T) {
-	repo, err := git.Init(memory.NewStorage(), memfs.New())
-	assert.NoError(t, err)
+func TestGetRemoteBranchesOptimized(t *testing.T) {
+	testCases := []struct {
+		name                string
+		masterBranchName    string
+		remoteBranches      map[string]string
+		skipBranches        map[string]bool
+		expectedBranches    []string
+		expectedBranchCount int
+	}{
+		{
+			name:             "skips custom master branch",
+			masterBranchName: "main",
+			remoteBranches: map[string]string{
+				"refs/remotes/origin/main":           "1111111111111111111111111111111111111111",
+				"refs/remotes/origin/feature-branch": "2222222222222222222222222222222222222222",
+			},
+			skipBranches:        map[string]bool{},
+			expectedBranches:    []string{"origin/feature-branch"},
+			expectedBranchCount: 1,
+		},
+		{
+			name:             "no other branches",
+			masterBranchName: "main",
+			remoteBranches: map[string]string{
+				"refs/remotes/origin/main": "1111111111111111111111111111111111111111",
+			},
+			skipBranches:        map[string]bool{},
+			expectedBranches:    []string{},
+			expectedBranchCount: 0,
+		},
+		{
+			name:             "skips branch from skip list",
+			masterBranchName: "master",
+			remoteBranches: map[string]string{
+				"refs/remotes/origin/master":         "1111111111111111111111111111111111111111",
+				"refs/remotes/origin/feature-branch": "2222222222222222222222222222222222222222",
+				"refs/remotes/origin/dont-delete":    "3333333333333333333333333333333333333333",
+			},
+			skipBranches:        map[string]bool{"dont-delete": true},
+			expectedBranches:    []string{"origin/feature-branch"},
+			expectedBranchCount: 1,
+		},
+	}
 
-	masterHash := plumbing.NewHash("1111111111111111111111111111111111111111")
-	featureHash := plumbing.NewHash("2222222222222222222222222222222222222222")
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, err := git.Init(memory.NewStorage(), memfs.New())
+			assert.NoError(t, err)
 
-	err = repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName("refs/remotes/origin/main"), masterHash))
-	assert.NoError(t, err)
-	err = repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName("refs/remotes/origin/feature-branch"), featureHash))
-	assert.NoError(t, err)
+			for branchName, hashStr := range tc.remoteBranches {
+				hash := plumbing.NewHash(hashStr)
+				err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(branchName), hash))
+				assert.NoError(t, err)
+			}
 
-	branches, err := getRemoteBranchesOptimized(repo, "origin", "main", map[string]bool{})
-	assert.NoError(t, err)
-	assert.Len(t, branches, 1)
-	assert.Equal(t, "origin/feature-branch", branches[0].Name)
+			branches, err := getRemoteBranchesOptimized(repo, "origin", tc.masterBranchName, tc.skipBranches)
+			assert.NoError(t, err)
+			assert.Len(t, branches, tc.expectedBranchCount)
+
+			branchNames := make([]string, len(branches))
+			for i, b := range branches {
+				branchNames[i] = b.Name
+			}
+
+			assert.ElementsMatch(t, tc.expectedBranches, branchNames)
+		})
+	}
 }
