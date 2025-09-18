@@ -157,7 +157,7 @@ func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]s
 	}
 
 	// Get remote branches efficiently
-	remoteBranches, err := getRemoteBranchesOptimized(repo, remoteOrigin, skipSet)
+	remoteBranches, err := getRemoteBranchesOptimized(repo, remoteOrigin, masterBranchName, skipSet)
 	if err != nil {
 		return nil, err
 	}
@@ -205,6 +205,7 @@ func getBranchHeadsOptimized(repo *git.Repository) (map[string]plumbing.Hash, er
 func getRemoteBranchesOptimized(
 	repo *git.Repository,
 	remoteOrigin string,
+	masterBranchName string,
 	skipSet map[string]bool,
 ) ([]BranchInfo, error) {
 	remoteBranches, err := RemoteBranches(repo.Storer)
@@ -213,7 +214,7 @@ func getRemoteBranchesOptimized(
 	}
 
 	var branches []BranchInfo
-	masterBranchRemote := fmt.Sprintf("%s/%s", remoteOrigin, "master")
+	masterBranchRemote := fmt.Sprintf("%s/%s", remoteOrigin, masterBranchName)
 
 	err = remoteBranches.ForEach(func(branch *plumbing.Reference) error {
 		remoteBranchName := strings.TrimPrefix(branch.Name().String(), "refs/remotes/")
