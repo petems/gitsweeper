@@ -2,7 +2,9 @@
 
 A CLI tool for cleaning up git repositories.
 
-**Note**: This version uses ultra-optimized code for improved performance and reduced binary size (7.8MB). The older unoptimized implementations have been removed.
+## Demo
+
+![gitsweeper demo](demo.gif)
 
 ## Usage
 
