@@ -27,7 +27,7 @@ const (
 	BatchSize = 100
 )
 
-// BranchInfo holds optimized branch information.
+// BranchInfo holds branch information.
 type BranchInfo struct {
 	Name   string
 	Hash   plumbing.Hash
@@ -104,7 +104,7 @@ func GetCurrentDirAsGitRepo() (*git.Repository, error) {
 	return repo, nil
 }
 
-// GetMergedBranchesUltra implements ultra-optimized merged branch detection.
+// GetMergedBranches finds branches that have been merged into the master branch.
 func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]string, error) {
 	repo, err := GetCurrentDirAsGitRepo()
 	if err != nil {
@@ -121,8 +121,8 @@ func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]s
 
 	LogInfo("Attempting to get master information from branches from repo")
 
-	// Get branch heads efficiently
-	branchHeads, err := getBranchHeadsOptimized(repo)
+	// Get branch heads
+	branchHeads, err := getBranchHeads(repo)
 	if err != nil {
 		return nil, err
 	}
@@ -156,8 +156,8 @@ func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]s
 		return nil, err
 	}
 
-	// Get remote branches efficiently
-	remoteBranches, err := getRemoteBranchesOptimized(repo, remoteOrigin, masterBranchName, skipSet)
+	// Get remote branches
+	remoteBranches, err := getRemoteBranches(repo, remoteOrigin, masterBranchName, skipSet)
 	if err != nil {
 		return nil, err
 	}
@@ -175,12 +175,12 @@ func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]s
 		return findMergedBranchesConcurrent(ctx, masterCommits, remoteBranches)
 	}
 
-	// Use optimized sequential processing for smaller sets
+	// Use sequential processing for smaller sets
 	return findMergedBranchesSequential(ctx, masterCommits, remoteBranches)
 }
 
-// getBranchHeadsOptimized efficiently gets all branch heads.
-func getBranchHeadsOptimized(repo *git.Repository) (map[string]plumbing.Hash, error) {
+// getBranchHeads gets all branch heads.
+func getBranchHeads(repo *git.Repository) (map[string]plumbing.Hash, error) {
 	branchRefs, err := repo.Branches()
 	if err != nil {
 		return nil, fmt.Errorf("list branches failed: %w", err)
@@ -201,8 +201,8 @@ func getBranchHeadsOptimized(repo *git.Repository) (map[string]plumbing.Hash, er
 	return branchHeads, nil
 }
 
-// getRemoteBranchesOptimized efficiently gets remote branches with filtering.
-func getRemoteBranchesOptimized(
+// getRemoteBranches gets remote branches with filtering.
+func getRemoteBranches(
 	repo *git.Repository,
 	remoteOrigin string,
 	masterBranchName string,

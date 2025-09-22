@@ -38,7 +38,7 @@ func TestParseBranchname_ThreeSlashes(t *testing.T) {
 	assert.Equal(t, "janedoe/cool-branch-name/and-another-branch-after/one-more-for-luck", branchShort)
 }
 
-func TestGetRemoteBranchesOptimized(t *testing.T) {
+func TestGetRemoteBranches(t *testing.T) {
 	testCases := []struct {
 		name                string
 		masterBranchName    string
@@ -93,7 +93,7 @@ func TestGetRemoteBranchesOptimized(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			branches, err := getRemoteBranchesOptimized(repo, "origin", tc.masterBranchName, tc.skipBranches)
+			branches, err := getRemoteBranches(repo, "origin", tc.masterBranchName, tc.skipBranches)
 			assert.NoError(t, err)
 			assert.Len(t, branches, tc.expectedBranchCount)
 
