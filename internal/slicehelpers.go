@@ -6,13 +6,12 @@ import (
 )
 
 // IsStringInSlice checks if a string is present in a slice of strings
-// Optimized version that uses binary search for sorted slices
 //
 //		letters := []string{"a", "b", "c", "d"}
 //	 IsStringInSlice("a", letters) // true
 //	 IsStringInSlice("e", letters) // false
 func IsStringInSlice(a string, list []string) bool {
-	// For small slices, linear search is faster due to CPU cache locality
+	// For small slices, linear search is faster
 	if len(list) < 8 {
 		for _, b := range list {
 			if b == a {
