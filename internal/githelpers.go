@@ -16,6 +16,9 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
+	"github.com/go-git/go-git/v5/plumbing/transport"
+	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 )
 
 const (
@@ -59,15 +62,82 @@ func ParseBranchname(branchString string) (remote, branchname string) {
 	return branchString, ""
 }
 
+// GetAuth attempts to get authentication credentials for git operations.
+// It tries SSH agent first, then SSH keys, then checks for environment variables.
+func GetAuth() (transport.AuthMethod, error) {
+	// Try SSH agent first
+	if sshAuth, err := ssh.NewSSHAgentAuth("git"); err == nil {
+		LogInfo("Using SSH agent for authentication")
+		return sshAuth, nil
+	}
+
+	// Try SSH key from default locations
+	sshKeyPaths := []string{
+		os.Getenv("HOME") + "/.ssh/id_rsa",
+		os.Getenv("HOME") + "/.ssh/id_ed25519",
+		os.Getenv("HOME") + "/.ssh/github_rsa",
+	}
+
+	for _, keyPath := range sshKeyPaths {
+		if _, err := os.Stat(keyPath); err == nil {
+			if sshKey, err := os.ReadFile(keyPath); err == nil {
+				if publicKey, err := ssh.NewPublicKeys("git", sshKey, ""); err == nil {
+					LogInfof("Using SSH key from %s for authentication", keyPath)
+					return publicKey, nil
+				}
+			}
+		}
+	}
+
+	// Try environment variables for HTTP auth
+	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+		LogInfo("Using GITHUB_TOKEN for authentication")
+		return &http.BasicAuth{
+			Username: "token", // GitHub uses "token" as username for token auth
+			Password: token,
+		}, nil
+	}
+
+	if token := os.Getenv("GIT_TOKEN"); token != "" {
+		LogInfo("Using GIT_TOKEN for authentication")
+		return &http.BasicAuth{
+			Username: "token",
+			Password: token,
+		}, nil
+	}
+
+	// Check for username/password environment variables
+	if username := os.Getenv("GIT_USERNAME"); username != "" {
+		if password := os.Getenv("GIT_PASSWORD"); password != "" {
+			LogInfo("Using GIT_USERNAME/GIT_PASSWORD for authentication")
+			return &http.BasicAuth{
+				Username: username,
+				Password: password,
+			}, nil
+		}
+	}
+
+	return nil, errors.New(
+		"no authentication method found - try setting GITHUB_TOKEN, GIT_TOKEN, or ensure SSH keys are configured",
+	)
+}
+
 func DeleteBranch(repo *git.Repository, remote, branchShortName string) error {
 	deleteRefSpec := config.RefSpec(fmt.Sprintf(":%s", plumbing.NewBranchReferenceName(branchShortName)))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	err := repo.PushContext(ctx, &git.PushOptions{
+	// Get authentication
+	auth, err := GetAuth()
+	if err != nil {
+		return fmt.Errorf("failed to get authentication: %w", err)
+	}
+
+	err = repo.PushContext(ctx, &git.PushOptions{
 		RemoteName: remote,
 		RefSpecs:   []config.RefSpec{deleteRefSpec},
+		Auth:       auth,
 	})
 
 	if err != nil {
