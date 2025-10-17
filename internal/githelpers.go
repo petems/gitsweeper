@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"runtime"
 	"sort"
 	"strings"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
@@ -59,19 +59,20 @@ func ParseBranchname(branchString string) (remote, branchname string) {
 	return branchString, ""
 }
 
+// DeleteBranch deletes a remote branch by shelling out to git.
+// We use shell commands instead of go-git for deletion to avoid complex authentication
+// handling. The go-git library has significant limitations with various authentication
+// methods (SSH keys, tokens, etc.). See: https://github.com/go-git/go-git/issues/28
 func DeleteBranch(repo *git.Repository, remote, branchShortName string) error {
-	deleteRefSpec := config.RefSpec(fmt.Sprintf(":%s", plumbing.NewBranchReferenceName(branchShortName)))
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	err := repo.PushContext(ctx, &git.PushOptions{
-		RemoteName: remote,
-		RefSpecs:   []config.RefSpec{deleteRefSpec},
-	})
+	cmd := exec.CommandContext(ctx, "git", "push", remote, "--delete", branchShortName)
+	output, err := cmd.CombinedOutput()
 
 	if err != nil {
-		return fmt.Errorf("failed to delete branch %s on remote %s: %w", branchShortName, remote, err)
+		return fmt.Errorf("failed to delete branch %s on remote %s: %w\nOutput: %s",
+			branchShortName, remote, err, string(output))
 	}
 
 	return nil

@@ -135,3 +135,15 @@ To delete them, run again with `git-sweep cleanup`
 ```
 
 but has a few changes that are tweaked toward my requirements.
+
+## Implementation Details
+
+### Git Operations & Authentication
+
+`gitsweeper` uses the [go-git](https://github.com/go-git/go-git) library for most Git operations (repository analysis, branch detection, commit traversal) which provides excellent cross-platform compatibility for read operations.
+
+However, for **branch deletion**, `gitsweeper` shells out to the system's `git` command (`git push --delete`) rather than using go-git's push functionality. This design decision addresses the significant complexity of authentication handling. Git authentication in the real world encompasses a huge variety of methods: SSH keys with passphrases, SSH agents, credential helpers, tokens, deploy keys, and more. Attempting to handle all these authentication methods through go-git's API is overly complex and error-prone.
+
+By leveraging the system's `git` command for deletion, we automatically inherit the user's existing Git configuration and authentication setup. Your SSH agent, credential helpers, and other authentication mechanisms "just work" without gitsweeper needing to know the details.
+
+For more context on the authentication challenges with go-git, see: https://github.com/go-git/go-git/issues/28
