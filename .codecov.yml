@@ -1,0 +1,34 @@
+# Codecov configuration
+# https://docs.codecov.com/docs/codecov-yaml
+
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+
+  status:
+    # Overall project coverage
+    project:
+      default:
+        target: 90%
+        threshold: 1%
+        informational: false
+
+    # Coverage for changes in a PR
+    patch:
+      default:
+        target: 90%
+        threshold: 1%
+        informational: false
+
+# Comment configuration
+comment:
+  layout: "reach,diff,flags,tree"
+  behavior: default
+  require_changes: false
+
+# Ignore generated files from coverage reports
+ignore:
+  - "**/*.pb.go"      # Protocol buffer generated files
+  - "vendor/**"       # Vendored dependencies
+  - "bin/**"          # Built binaries
