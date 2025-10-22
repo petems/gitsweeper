@@ -100,13 +100,13 @@ func main() {
 }
 
 func handlePreview(origin, master, skipBranches string) {
-	_, err := hlpr.GetCurrentDirAsGitRepo()
+	repo, err := hlpr.GetCurrentDirAsGitRepo()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: This is not a Git repository\n")
 		os.Exit(1)
 	}
 
-	mergedBranches, err := hlpr.GetMergedBranches(origin, master, skipBranches)
+	mergedBranches, err := hlpr.GetMergedBranches(repo, origin, master, skipBranches)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error when looking for branches: %s\n", err)
 		os.Exit(1)
@@ -124,7 +124,7 @@ func handlePreview(origin, master, skipBranches string) {
 }
 
 func handleCleanup(origin, master, skipBranches string, force bool) {
-	_, err := hlpr.GetCurrentDirAsGitRepo()
+	repo, err := hlpr.GetCurrentDirAsGitRepo()
 	if err != nil {
 		fmt.Fprintf(
 			os.Stderr,
@@ -133,7 +133,7 @@ func handleCleanup(origin, master, skipBranches string, force bool) {
 		os.Exit(1)
 	}
 
-	mergedBranches, err := hlpr.GetMergedBranches(origin, master, skipBranches)
+	mergedBranches, err := hlpr.GetMergedBranches(repo, origin, master, skipBranches)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "gitsweeper-int-test: error: Error when looking for branches %s\n", err)
 		os.Exit(1)
@@ -161,11 +161,6 @@ func handleCleanup(origin, master, skipBranches string, force bool) {
 	}
 
 	fmt.Printf("\n")
-	repo, err := hlpr.GetCurrentDirAsGitRepo()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting git repository: %s\n", err)
-		os.Exit(1)
-	}
 
 	// Process deletions with progress indication for large sets
 	total := len(mergedBranches)
