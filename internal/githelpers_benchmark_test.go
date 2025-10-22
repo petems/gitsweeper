@@ -33,38 +33,45 @@ func generateTestBranches(hashes []plumbing.Hash) []BranchInfo {
 	return branches
 }
 
-// BenchmarkHashMapString benchmarks the old approach using string keys.
-func BenchmarkHashMapString(b *testing.B) {
-	testCases := []struct {
-		name      string
-		branches  int
-		commits   int
-		matchRate float64 // percentage of commits that match branches
-	}{
-		{"10branches_100commits_10pct", 10, 100, 0.1},
-		{"100branches_1000commits_5pct", 100, 1000, 0.05},
-		{"500branches_5000commits_2pct", 500, 5000, 0.02},
-		{"1000branches_10000commits_1pct", 1000, 10000, 0.01},
+// Shared test case definitions for benchmarks.
+var benchmarkTestCases = []struct {
+	name      string
+	branches  int
+	commits   int
+	matchRate float64 // percentage of commits that match branches
+}{
+	{"10branches_100commits_10pct", 10, 100, 0.1},
+	{"100branches_1000commits_5pct", 100, 1000, 0.05},
+	{"500branches_5000commits_2pct", 500, 5000, 0.02},
+	{"1000branches_10000commits_1pct", 1000, 10000, 0.01},
+}
+
+// generateBenchmarkData creates branch and commit data for benchmarking.
+// Returns branch info and commit hashes with the specified match rate.
+func generateBenchmarkData(branches, commits int, matchRate float64) ([]BranchInfo, []plumbing.Hash) {
+	branchHashes := generateTestHashes(branches)
+	branchInfos := generateTestBranches(branchHashes)
+
+	commitHashes := make([]plumbing.Hash, commits)
+	matchCount := int(float64(commits) * matchRate)
+	for i := 0; i < matchCount; i++ {
+		// Use actual branch hashes for matches
+		commitHashes[i] = branchHashes[i%len(branchHashes)]
+	}
+	for i := matchCount; i < commits; i++ {
+		// Generate unique non-matching hashes
+		data := []byte(fmt.Sprintf("non-match-%d", i))
+		commitHashes[i] = plumbing.NewHash(fmt.Sprintf("%x", sha1.Sum(data)))
 	}
 
-	for _, tc := range testCases {
-		b.Run(tc.name, func(b *testing.B) {
-			// Generate test data
-			branchHashes := generateTestHashes(tc.branches)
-			branches := generateTestBranches(branchHashes)
+	return branchInfos, commitHashes
+}
 
-			// Generate commits (mix of branch hashes and non-matching hashes)
-			commits := make([]plumbing.Hash, tc.commits)
-			matchCount := int(float64(tc.commits) * tc.matchRate)
-			for i := 0; i < matchCount; i++ {
-				// Use actual branch hashes for matches
-				commits[i] = branchHashes[i%len(branchHashes)]
-			}
-			for i := matchCount; i < tc.commits; i++ {
-				// Generate unique non-matching hashes
-				data := []byte(fmt.Sprintf("non-match-%d", i))
-				commits[i] = plumbing.NewHash(fmt.Sprintf("%x", sha1.Sum(data)))
-			}
+// BenchmarkHashMapString benchmarks the old approach using string keys.
+func BenchmarkHashMapString(b *testing.B) {
+	for _, tc := range benchmarkTestCases {
+		b.Run(tc.name, func(b *testing.B) {
+			branches, commits := generateBenchmarkData(tc.branches, tc.commits, tc.matchRate)
 
 			b.ResetTimer()
 			b.ReportAllocs()
@@ -92,36 +99,9 @@ func BenchmarkHashMapString(b *testing.B) {
 
 // BenchmarkHashMapPlumbingHash benchmarks the new approach using plumbing.Hash keys.
 func BenchmarkHashMapPlumbingHash(b *testing.B) {
-	testCases := []struct {
-		name      string
-		branches  int
-		commits   int
-		matchRate float64 // percentage of commits that match branches
-	}{
-		{"10branches_100commits_10pct", 10, 100, 0.1},
-		{"100branches_1000commits_5pct", 100, 1000, 0.05},
-		{"500branches_5000commits_2pct", 500, 5000, 0.02},
-		{"1000branches_10000commits_1pct", 1000, 10000, 0.01},
-	}
-
-	for _, tc := range testCases {
+	for _, tc := range benchmarkTestCases {
 		b.Run(tc.name, func(b *testing.B) {
-			// Generate test data
-			branchHashes := generateTestHashes(tc.branches)
-			branches := generateTestBranches(branchHashes)
-
-			// Generate commits (mix of branch hashes and non-matching hashes)
-			commits := make([]plumbing.Hash, tc.commits)
-			matchCount := int(float64(tc.commits) * tc.matchRate)
-			for i := 0; i < matchCount; i++ {
-				// Use actual branch hashes for matches
-				commits[i] = branchHashes[i%len(branchHashes)]
-			}
-			for i := matchCount; i < tc.commits; i++ {
-				// Generate unique non-matching hashes
-				data := []byte(fmt.Sprintf("non-match-%d", i))
-				commits[i] = plumbing.NewHash(fmt.Sprintf("%x", sha1.Sum(data)))
-			}
+			branches, commits := generateBenchmarkData(tc.branches, tc.commits, tc.matchRate)
 
 			b.ResetTimer()
 			b.ReportAllocs()
