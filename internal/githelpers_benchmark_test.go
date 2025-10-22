@@ -36,10 +36,10 @@ func generateTestBranches(hashes []plumbing.Hash) []BranchInfo {
 // BenchmarkHashMapString benchmarks the old approach using string keys.
 func BenchmarkHashMapString(b *testing.B) {
 	testCases := []struct {
-		name        string
-		branches    int
-		commits     int
-		matchRate   float64 // percentage of commits that match branches
+		name      string
+		branches  int
+		commits   int
+		matchRate float64 // percentage of commits that match branches
 	}{
 		{"10branches_100commits_10pct", 10, 100, 0.1},
 		{"100branches_1000commits_5pct", 100, 1000, 0.05},
@@ -92,10 +92,10 @@ func BenchmarkHashMapString(b *testing.B) {
 // BenchmarkHashMapPlumbingHash benchmarks the new approach using plumbing.Hash keys.
 func BenchmarkHashMapPlumbingHash(b *testing.B) {
 	testCases := []struct {
-		name        string
-		branches    int
-		commits     int
-		matchRate   float64 // percentage of commits that match branches
+		name      string
+		branches  int
+		commits   int
+		matchRate float64 // percentage of commits that match branches
 	}{
 		{"10branches_100commits_10pct", 10, 100, 0.1},
 		{"100branches_1000commits_5pct", 100, 1000, 0.05},
