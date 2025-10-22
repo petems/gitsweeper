@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `gitsweeper` is a CLI tool for cleaning up merged git branches, written in Go. It's a modern rewrite of the Python-based `git-sweep` tool, designed to identify and delete remote branches that have been merged into the main branch.
 
-**Go Version Requirement: This project requires Go 1.23 or later.** This is due to security dependencies in `go-git` v5.14.0+ which require `golang.org/x/crypto@v0.35.0+` to mitigate CVE-2025-22869 (GO-2025-3487), a denial of service vulnerability in SSH implementations. Users unable to upgrade to Go 1.23 should use a version of gitsweeper built with go-git v5.13.x or earlier.
+**Go Version Requirement: This project requires Go 1.23 or later.** This is due to security dependencies in `go-git` v5.14.0+ which require `golang.org/x/crypto@v0.35.0+` to mitigate CVE-2025-22869 (GO-2025-3487), a denial-of-service vulnerability in SSH implementations. Users unable to upgrade to Go 1.23 should use a version of gitsweeper built with go-git v5.13.x or earlier.
 
 ## Architecture
 
