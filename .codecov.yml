@@ -26,3 +26,9 @@ comment:
   layout: "reach,diff,flags,tree"
   behavior: default
   require_changes: false
+
+# Ignore generated files from coverage reports
+ignore:
+  - "**/*.pb.go"      # Protocol buffer generated files
+  - "vendor/**"       # Vendored dependencies
+  - "bin/**"          # Built binaries
