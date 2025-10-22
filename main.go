@@ -126,16 +126,13 @@ func handlePreview(origin, master, skipBranches string) {
 func handleCleanup(origin, master, skipBranches string, force bool) {
 	repo, err := hlpr.GetCurrentDirAsGitRepo()
 	if err != nil {
-		fmt.Fprintf(
-			os.Stderr,
-			"gitsweeper-int-test: error: Error when looking for branches repository does not exist\n",
-		)
+		fmt.Fprintf(os.Stderr, "Error: This is not a Git repository\n")
 		os.Exit(1)
 	}
 
 	mergedBranches, err := hlpr.GetMergedBranches(repo, origin, master, skipBranches)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "gitsweeper-int-test: error: Error when looking for branches %s\n", err)
+		fmt.Fprintf(os.Stderr, "Error when looking for branches: %s\n", err)
 		os.Exit(1)
 	}
 
