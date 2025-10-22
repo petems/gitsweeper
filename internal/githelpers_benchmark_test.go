@@ -61,8 +61,9 @@ func BenchmarkHashMapString(b *testing.B) {
 				commits[i] = branchHashes[i%len(branchHashes)]
 			}
 			for i := matchCount; i < tc.commits; i++ {
-				// Generate non-matching hashes
-				commits[i] = generateTestHashes(1)[0]
+				// Generate unique non-matching hashes
+				data := []byte(fmt.Sprintf("non-match-%d", i))
+				commits[i] = plumbing.NewHash(fmt.Sprintf("%x", sha1.Sum(data)))
 			}
 
 			b.ResetTimer()
@@ -117,8 +118,9 @@ func BenchmarkHashMapPlumbingHash(b *testing.B) {
 				commits[i] = branchHashes[i%len(branchHashes)]
 			}
 			for i := matchCount; i < tc.commits; i++ {
-				// Generate non-matching hashes
-				commits[i] = generateTestHashes(1)[0]
+				// Generate unique non-matching hashes
+				data := []byte(fmt.Sprintf("non-match-%d", i))
+				commits[i] = plumbing.NewHash(fmt.Sprintf("%x", sha1.Sum(data)))
 			}
 
 			b.ResetTimer()
