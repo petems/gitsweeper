@@ -3,10 +3,10 @@ package internal
 import (
 	"testing"
 
+	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/storage/memory"
-	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

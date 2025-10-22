@@ -41,6 +41,8 @@ type commitBatch struct {
 	startIdx int
 }
 
+// RemoteBranches returns an iterator over all remote branch references in the repository.
+// It filters the reference store to return only references that represent remote branches.
 func RemoteBranches(s storer.ReferenceStorer) (storer.ReferenceIter, error) {
 	refs, err := s.IterReferences()
 	if err != nil {
@@ -61,15 +63,19 @@ func ParseBranchname(branchString string) (remote, branchname string) {
 	return branchString, ""
 }
 
-// DeleteBranch deletes a remote branch by shelling out to git.
-// We use shell commands instead of go-git for deletion to avoid complex authentication
-// handling. The go-git library has significant limitations with various authentication
 // DeleteBranch deletes the named branch from the given remote by invoking
 // `git push <remote> --delete <branchShortName>`.
 //
-// It runs the command with a 30-second timeout and returns an error containing
-// the command's combined output if the deletion fails.
-func DeleteBranch(repo *git.Repository, remote, branchShortName string) error {
+// We shell out to git instead of using go-git's push operations to avoid complex
+// authentication handling. The go-git library has significant limitations with various
+// authentication methods (SSH keys with passphrases, SSH agents, credential helpers,
+// tokens, deploy keys, etc.). By using the system git command, we leverage the user's
+// existing authentication configuration automatically.
+// See: https://github.com/go-git/go-git/issues/28
+//
+// The command runs with a 30-second timeout and returns an error containing
+// the combined output if the deletion fails.
+func DeleteBranch(_ *git.Repository, remote, branchShortName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
