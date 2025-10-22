@@ -79,9 +79,29 @@ func ParseBranchname(branchString string) (remote, branchname string) {
 // existing authentication configuration automatically.
 // See: https://github.com/go-git/go-git/issues/28
 //
-// The command runs with a 30-second timeout and returns an error containing
-// the combined output if the deletion fails.
+// The function validates inputs (non-empty remote and branchShortName, branchShortName
+// must not start with '-'), verifies git is available, sets GIT_TERMINAL_PROMPT=0 for
+// non-interactive contexts, and runs with a 30-second timeout. Returns a timeout-specific
+// error if context deadline is exceeded, otherwise returns an error containing the
+// trimmed command output for diagnostics.
 func DeleteBranch(repo *git.Repository, remote, branchShortName string) error {
+	// Validate inputs
+	if remote == "" {
+		return errors.New("remote name cannot be empty")
+	}
+	if branchShortName == "" {
+		return errors.New("branch name cannot be empty")
+	}
+	if strings.HasPrefix(branchShortName, "-") {
+		return fmt.Errorf("branch name cannot start with '-': %s", branchShortName)
+	}
+
+	// Verify git is available
+	gitPath, err := exec.LookPath("git")
+	if err != nil {
+		return fmt.Errorf("git command not found in PATH: %w", err)
+	}
+
 	worktree, err := repo.Worktree()
 	if err != nil {
 		return fmt.Errorf("failed to get worktree: %w", err)
@@ -91,13 +111,25 @@ func DeleteBranch(repo *git.Repository, remote, branchShortName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "git", "push", remote, "--delete", branchShortName)
+	// gitPath is validated via exec.LookPath, remote and branchShortName are validated inputs
+	// passed as separate arguments (not shell interpolation), making this safe from injection
+	//nolint:gosec // validated inputs, no shell interpolation
+	cmd := exec.CommandContext(ctx, gitPath, "push", remote, "--delete", branchShortName)
 	cmd.Dir = repoPath
+	// Set non-interactive environment to fail cleanly in non-interactive contexts
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
+
 	output, err := cmd.CombinedOutput()
+	trimmedOutput := strings.TrimSpace(string(output))
 
 	if err != nil {
+		// Check for timeout specifically
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("timeout deleting branch %s on remote %s after 30s: %w\nOutput: %s",
+				branchShortName, remote, err, trimmedOutput)
+		}
 		return fmt.Errorf("failed to delete branch %s on remote %s: %w\nOutput: %s",
-			branchShortName, remote, err, string(output))
+			branchShortName, remote, err, trimmedOutput)
 	}
 
 	return nil
