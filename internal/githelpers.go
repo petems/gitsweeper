@@ -52,6 +52,8 @@ func RemoteBranches(s storer.ReferenceStorer) (storer.ReferenceIter, error) {
 	}, refs), nil
 }
 
+// ParseBranchname splits a branch string of the form "remote/branch" into the remote and branch name.
+// If the input contains no slash, the entire input is returned as the remote and the branch name is empty.
 func ParseBranchname(branchString string) (remote, branchname string) {
 	if idx := strings.IndexByte(branchString, '/'); idx > 0 {
 		return branchString[:idx], branchString[idx+1:]
@@ -62,7 +64,11 @@ func ParseBranchname(branchString string) (remote, branchname string) {
 // DeleteBranch deletes a remote branch by shelling out to git.
 // We use shell commands instead of go-git for deletion to avoid complex authentication
 // handling. The go-git library has significant limitations with various authentication
-// methods (SSH keys, tokens, etc.). See: https://github.com/go-git/go-git/issues/28
+// DeleteBranch deletes the named branch from the given remote by invoking
+// `git push <remote> --delete <branchShortName>`.
+//
+// It runs the command with a 30-second timeout and returns an error containing
+// the command's combined output if the deletion fails.
 func DeleteBranch(repo *git.Repository, remote, branchShortName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
