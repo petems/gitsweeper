@@ -170,7 +170,7 @@ func handleCleanup(origin, master, skipBranches string, force bool) {
 	// Process deletions with progress indication for large sets
 	total := len(mergedBranches)
 	for i, branchName := range mergedBranches {
-		remote, branchShort := hlpr.ParseBranchname(branchName)
+		remote, branchShort := hlpr.ParseBranchName(branchName)
 		if total > 10 {
 			fmt.Printf("  [%d/%d] deleting %s", i+1, total, branchName)
 		} else {

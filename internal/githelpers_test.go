@@ -3,37 +3,37 @@ package internal
 import (
 	"testing"
 
+	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/storage/memory"
-	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseBranchname(t *testing.T) {
-	remote, branchShort := ParseBranchname("origin/cool-branch-name")
+func TestParseBranchName(t *testing.T) {
+	remote, branchShort := ParseBranchName("origin/cool-branch-name")
 
 	assert.Equal(t, "origin", remote)
 	assert.Equal(t, "cool-branch-name", branchShort)
 }
 
-func TestParseBranchname_OneSlash(t *testing.T) {
-	remote, branchShort := ParseBranchname("origin/janedoe/cool-branch-name")
+func TestParseBranchName_OneSlash(t *testing.T) {
+	remote, branchShort := ParseBranchName("origin/janedoe/cool-branch-name")
 
 	assert.Equal(t, "origin", remote)
 	assert.Equal(t, "janedoe/cool-branch-name", branchShort)
 }
 
-func TestParseBranchname_TwoSlashes(t *testing.T) {
-	remote, branchShort := ParseBranchname("origin/janedoe/cool-branch-name/and-another-branch-after")
+func TestParseBranchName_TwoSlashes(t *testing.T) {
+	remote, branchShort := ParseBranchName("origin/janedoe/cool-branch-name/and-another-branch-after")
 
 	assert.Equal(t, "origin", remote)
 	assert.Equal(t, "janedoe/cool-branch-name/and-another-branch-after", branchShort)
 }
 
-func TestParseBranchname_ThreeSlashes(t *testing.T) {
-	remote, branchShort := ParseBranchname("origin/janedoe/cool-branch-name/and-another-branch-after/one-more-for-luck")
+func TestParseBranchName_ThreeSlashes(t *testing.T) {
+	remote, branchShort := ParseBranchName("origin/janedoe/cool-branch-name/and-another-branch-after/one-more-for-luck")
 
 	assert.Equal(t, "origin", remote)
 	assert.Equal(t, "janedoe/cool-branch-name/and-another-branch-after/one-more-for-luck", branchShort)

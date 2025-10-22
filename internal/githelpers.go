@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"runtime"
 	"sort"
 	"strings"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
@@ -41,6 +41,10 @@ type commitBatch struct {
 	startIdx int
 }
 
+// RemoteBranches returns an iterator over all remote branch references in the repository.
+// It filters the reference store to return only references that represent remote branches.
+// Symbolic references like "refs/remotes/<remote>/HEAD" are excluded to prevent zero-hash
+// entries and false positives downstream.
 func RemoteBranches(s storer.ReferenceStorer) (storer.ReferenceIter, error) {
 	refs, err := s.IterReferences()
 	if err != nil {
@@ -48,30 +52,84 @@ func RemoteBranches(s storer.ReferenceStorer) (storer.ReferenceIter, error) {
 	}
 
 	return storer.NewReferenceFilteredIter(func(ref *plumbing.Reference) bool {
-		return ref.Name().IsRemote()
+		// Keep only remote branch hash-refs; drop symbolic refs like "refs/remotes/<remote>/HEAD".
+		if !ref.Name().IsRemote() || ref.Type() != plumbing.HashReference {
+			return false
+		}
+		return !strings.HasSuffix(ref.Name().String(), "/HEAD")
 	}, refs), nil
 }
 
-func ParseBranchname(branchString string) (remote, branchname string) {
-	if idx := strings.IndexByte(branchString, '/'); idx > 0 {
-		return branchString[:idx], branchString[idx+1:]
+// ParseBranchName splits a branch string of the form "remote/branch" into the remote and branch name.
+// If the input contains no slash, the entire input is returned as the remote and the branch name is empty.
+func ParseBranchName(s string) (remote, branch string) {
+	if before, after, ok := strings.Cut(s, "/"); ok && before != "" {
+		return before, after
 	}
-	return branchString, ""
+	return s, ""
 }
 
+// DeleteBranch deletes the named branch from the given remote by invoking
+// `git push <remote> --delete <branchShortName>`.
+//
+// We shell out to git instead of using go-git's push operations to avoid complex
+// authentication handling. The go-git library has significant limitations with various
+// authentication methods (SSH keys with passphrases, SSH agents, credential helpers,
+// tokens, deploy keys, etc.). By using the system git command, we leverage the user's
+// existing authentication configuration automatically.
+// See: https://github.com/go-git/go-git/issues/28
+//
+// The function validates inputs (non-empty remote and branchShortName, branchShortName
+// must not start with '-'), verifies git is available, sets GIT_TERMINAL_PROMPT=0 for
+// non-interactive contexts, and runs with a 30-second timeout. Returns a timeout-specific
+// error if context deadline is exceeded, otherwise returns an error containing the
+// trimmed command output for diagnostics.
 func DeleteBranch(repo *git.Repository, remote, branchShortName string) error {
-	deleteRefSpec := config.RefSpec(fmt.Sprintf(":%s", plumbing.NewBranchReferenceName(branchShortName)))
+	// Validate inputs
+	if remote == "" {
+		return errors.New("remote name cannot be empty")
+	}
+	if branchShortName == "" {
+		return errors.New("branch name cannot be empty")
+	}
+	if strings.HasPrefix(branchShortName, "-") {
+		return fmt.Errorf("branch name cannot start with '-': %s", branchShortName)
+	}
+
+	// Verify git is available
+	gitPath, err := exec.LookPath("git")
+	if err != nil {
+		return fmt.Errorf("git command not found in PATH: %w", err)
+	}
+
+	worktree, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+	repoPath := worktree.Filesystem.Root()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	err := repo.PushContext(ctx, &git.PushOptions{
-		RemoteName: remote,
-		RefSpecs:   []config.RefSpec{deleteRefSpec},
-	})
+	// gitPath is validated via exec.LookPath, remote and branchShortName are validated inputs
+	// passed as separate arguments (not shell interpolation), making this safe from injection
+	//nolint:gosec // validated inputs, no shell interpolation
+	cmd := exec.CommandContext(ctx, gitPath, "push", remote, "--delete", branchShortName)
+	cmd.Dir = repoPath
+	// Set non-interactive environment to fail cleanly in non-interactive contexts
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
+
+	output, err := cmd.CombinedOutput()
+	trimmedOutput := strings.TrimSpace(string(output))
 
 	if err != nil {
-		return fmt.Errorf("failed to delete branch %s on remote %s: %w", branchShortName, remote, err)
+		// Check for timeout specifically
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("timeout deleting branch %s on remote %s after 30s: %w\nOutput: %s",
+				branchShortName, remote, err, trimmedOutput)
+		}
+		return fmt.Errorf("failed to delete branch %s on remote %s: %w\nOutput: %s",
+			branchShortName, remote, err, trimmedOutput)
 	}
 
 	return nil
@@ -224,7 +282,7 @@ func getRemoteBranches(
 			return nil
 		}
 
-		remote, shortBranchName := ParseBranchname(remoteBranchName)
+		remote, shortBranchName := ParseBranchName(remoteBranchName)
 
 		// Filter by origin and skip list
 		if remote == remoteOrigin {

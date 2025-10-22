@@ -10,12 +10,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **`main.go`**: Entry point with command-line argument parsing using Go's standard `flag` package. Supports `preview` and `cleanup` commands with flags for debug, origin, master branch name, skip patterns, and force mode.
 - **`internal/`**: Core functionality split into focused helper modules:
-  - `githelpers.go`: Git operations using `go-git` library for repository operations, branch detection, and deletion
+  - `githelpers.go`: Git operations using `go-git` library for repository operations and branch detection; shells out to git for branch deletion
   - `prompthelpers.go`: User interaction utilities for confirmation prompts
   - `loghelpers.go`: Lightweight logging setup
   - `slicehelpers.go`: Utility functions for slice operations
 
-The application uses the `go-git` library for Git operations rather than shelling out to Git commands, making it more portable and reliable.
+The application uses the `go-git` library for most Git operations (reading, analysis, branch detection) rather than shelling out to Git commands, making it more portable and reliable.
+
+### Authentication Handling
+
+**Branch deletion uses shell commands (`git push --delete`) instead of go-git's push operations.** While go-git is excellent for read operations, it has significant complexity and limitations when dealing with authenticated push operations. There's a huge variety of authentication methods in the wild (SSH keys with passphrases, SSH agents, various credential helpers, tokens, deploy keys, etc.), and trying to handle them all through go-git's authentication API is overly complex and error-prone.
+
+By shelling out to the system's `git` command for deletion, we leverage the user's existing Git configuration and authentication setup automatically. The system git already knows how to work with SSH agents, credential helpers, and other authentication mechanisms configured by the user.
+
+See the go-git project's long-standing authentication complexity issues: https://github.com/go-git/go-git/issues/28
 
 ## Development Commands
 
