@@ -43,6 +43,8 @@ type commitBatch struct {
 
 // RemoteBranches returns an iterator over all remote branch references in the repository.
 // It filters the reference store to return only references that represent remote branches.
+// Symbolic references like "refs/remotes/<remote>/HEAD" are excluded to prevent zero-hash
+// entries and false positives downstream.
 func RemoteBranches(s storer.ReferenceStorer) (storer.ReferenceIter, error) {
 	refs, err := s.IterReferences()
 	if err != nil {
@@ -50,7 +52,11 @@ func RemoteBranches(s storer.ReferenceStorer) (storer.ReferenceIter, error) {
 	}
 
 	return storer.NewReferenceFilteredIter(func(ref *plumbing.Reference) bool {
-		return ref.Name().IsRemote()
+		// Keep only remote branch hash-refs; drop symbolic refs like "refs/remotes/<remote>/HEAD".
+		if !ref.Name().IsRemote() || ref.Type() != plumbing.HashReference {
+			return false
+		}
+		return !strings.HasSuffix(ref.Name().String(), "/HEAD")
 	}, refs), nil
 }
 
