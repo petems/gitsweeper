@@ -317,10 +317,9 @@ func findMergedBranchesSequential(
 	branches []BranchInfo,
 ) ([]string, error) {
 	// Create hash lookup map
-	branchHashMap := make(map[string][]BranchInfo, len(branches))
+	branchHashMap := make(map[plumbing.Hash][]BranchInfo, len(branches))
 	for _, branch := range branches {
-		hashStr := branch.Hash.String()
-		branchHashMap[hashStr] = append(branchHashMap[hashStr], branch)
+		branchHashMap[branch.Hash] = append(branchHashMap[branch.Hash], branch)
 	}
 
 	var mergedBranches []string
@@ -348,8 +347,8 @@ func findMergedBranchesSequential(
 		}
 
 		// Check if this commit hash matches any branch
-		commitHash := commit.Hash.String()
-		if branchInfos, exists := branchHashMap[commitHash]; exists {
+		if branchInfos, exists := branchHashMap[commit.Hash]; exists {
+			commitHash := commit.Hash.String()
 			for _, branchInfo := range branchInfos {
 				if !foundBranches[branchInfo.Name] {
 					LogInfof(
@@ -382,10 +381,9 @@ func findMergedBranchesConcurrent(
 	branches []BranchInfo,
 ) ([]string, error) {
 	// Create hash lookup map
-	branchHashMap := make(map[string][]BranchInfo, len(branches))
+	branchHashMap := make(map[plumbing.Hash][]BranchInfo, len(branches))
 	for _, branch := range branches {
-		hashStr := branch.Hash.String()
-		branchHashMap[hashStr] = append(branchHashMap[hashStr], branch)
+		branchHashMap[branch.Hash] = append(branchHashMap[branch.Hash], branch)
 	}
 
 	// Channel for commit batches
@@ -486,7 +484,7 @@ func findMergedBranchesConcurrent(
 func processCommitBatches(
 	ctx context.Context,
 	batches <-chan commitBatch,
-	branchHashMap map[string][]BranchInfo,
+	branchHashMap map[plumbing.Hash][]BranchInfo,
 	totalBranches int,
 ) []string {
 	var mergedBranches []string
@@ -507,8 +505,8 @@ func processCommitBatches(
 
 		// Process commits in this batch
 		for _, commit := range batch.commits {
-			commitHash := commit.Hash.String()
-			if branchInfos, exists := branchHashMap[commitHash]; exists {
+			if branchInfos, exists := branchHashMap[commit.Hash]; exists {
+				commitHash := commit.Hash.String()
 				for _, branchInfo := range branchInfos {
 					if !foundBranches[branchInfo.Name] {
 						LogInfof(
