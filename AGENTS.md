@@ -1,5 +1,8 @@
 # Repository Guidelines
 
+## Go Version Requirement
+**This project requires Go 1.23 or later.** The minimum version is enforced by security dependencies in `go-git` v5.14.0+ which require `golang.org/x/crypto@v0.35.0+` to mitigate CVE-2025-22869 (GO-2025-3487), a denial of service vulnerability in SSH implementations. All CI workflows and local development should use Go 1.23+.
+
 ## Project Structure & Module Organization
 The CLI entrypoint lives in `main.go`, while reusable logic is grouped under `internal/` (e.g., `githelpers.go`, `prompthelpers.go`). Integration specs reside in `features/` with Ruby step definitions in `features/step_definitions/`. Generated binaries land in `bin/`, release artifacts in `dist/`, and the Homebrew formula sits in `Formula/`. Supporting scripts such as `install.sh` and `test-goreleaser.sh` configure installs and release checks.
 
