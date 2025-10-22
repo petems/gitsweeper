@@ -75,11 +75,18 @@ func ParseBranchname(branchString string) (remote, branchname string) {
 //
 // The command runs with a 30-second timeout and returns an error containing
 // the combined output if the deletion fails.
-func DeleteBranch(_ *git.Repository, remote, branchShortName string) error {
+func DeleteBranch(repo *git.Repository, remote, branchShortName string) error {
+	worktree, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+	repoPath := worktree.Filesystem.Root()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "git", "push", remote, "--delete", branchShortName)
+	cmd.Dir = repoPath
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
