@@ -86,11 +86,33 @@ brew bundle
 
 ## Testing
 
-The project includes both unit tests (Go) and integration tests (Cucumber/Ruby). The integration tests require a Ruby environment with Bundle.
+The project includes both unit tests (Go) and acceptance tests (Cucumber/Ruby). The acceptance tests require a Ruby environment with Bundle and use Docker for integration testing.
 
-Run unit tests: `make test`  
-Run integration tests: `make cucumber`  
+**IMPORTANT: Always run acceptance tests before committing changes that affect CLI output or error messages.**
+
+Run unit tests: `make test`
+Run acceptance tests: `make cucumber`
 Generate coverage report: `make cover` then `make cover_html`
+
+### Running Acceptance Tests
+
+Acceptance tests use Cucumber with Ruby step definitions. They build a Docker container with the compiled binary and test real-world CLI scenarios:
+
+```bash
+# Run all acceptance tests
+make cucumber
+
+# Run specific feature
+bundle exec cucumber features/preview.feature
+```
+
+The acceptance tests verify:
+- CLI output format and messaging
+- Error handling and error messages
+- Branch detection and cleanup behavior
+- User interaction flows
+
+**When modifying error messages or CLI output, you MUST update the corresponding Cucumber feature expectations and run the tests to verify.**
 
 ## Configuration Files
 

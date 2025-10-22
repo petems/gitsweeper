@@ -63,7 +63,7 @@ Feature: Cleanup Command
     When I run `gitsweeper-int-test cleanup`
     Then the output should contain:
       """
-      gitsweeper-int-test: error: Error when looking for branches repository does not exist
+      Error: This is not a Git repository
       """
     And the exit status should be 1
 

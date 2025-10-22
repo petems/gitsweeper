@@ -13,7 +13,16 @@ Use `make build` to compile an optimized binary into `bin/gitsweeper`. `make tes
 All Go code must be `gofmt`ed; the default tab indentation and `MixedCaps` identifiers follow standard Go style. Keep exported symbols minimal—prefer `internal/` packages for helpers. Run `golangci-lint run` before sending a PR; align with existing helper naming patterns such as `loghelpers` and `slicehelpers`. Shell scripts should pass `shellcheck`; mirror the defensive checks already present in `install.sh`.
 
 ## Testing Guidelines
-Place unit tests alongside source files using the `_test.go` suffix (`internal/githelpers_test.go` as reference). Use table-driven tests for new logic and ensure race detection succeeds (`go test -race ./...`). Cucumber scenarios live in `features/*.feature`; name steps in plain language mirroring CLI behavior and run them with `bundle exec cucumber`. Keep coverage reports (`profile.out`) out of version control.
+Place unit tests alongside source files using the `_test.go` suffix (`internal/githelpers_test.go` as reference). Use table-driven tests for new logic and ensure race detection succeeds (`go test -race ./...`).
+
+### Acceptance Tests (Critical for CLI Changes)
+**IMPORTANT: Always run acceptance tests (`make cucumber`) before committing any changes that affect:**
+- Error messages or error handling
+- CLI output format or content
+- Command-line argument parsing
+- User interaction flows
+
+Cucumber scenarios live in `features/*.feature`; name steps in plain language mirroring CLI behavior. The acceptance tests build a Docker container with the compiled binary and test real-world scenarios. When modifying error messages or output, you MUST update the corresponding feature file expectations. Run them with `make cucumber` or `bundle exec cucumber features/specific.feature` for targeted testing. Keep coverage reports (`profile.out`) out of version control.
 
 ## Commit & Pull Request Guidelines
 Follow the dominant Conventional Commit style: prefixes like `feat:` and `fix:` appear throughout (`fix: add explicit permissions...`, `feat: implement Windows-specific zip builds`). Include context-rich messages and reference pull requests or issues in parentheses when relevant. Before opening a PR, run `make lint test cucumber` and note the results. Provide a concise summary, expected CLI output (e.g., `gitsweeper preview`), and link related issues. Screenshots or logs are encouraged when behavior changes.

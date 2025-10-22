@@ -163,12 +163,7 @@ func GetCurrentDirAsGitRepo() (*git.Repository, error) {
 }
 
 // GetMergedBranches finds branches that have been merged into the master branch.
-func GetMergedBranches(remoteOrigin, masterBranchName, skipBranches string) ([]string, error) {
-	repo, err := GetCurrentDirAsGitRepo()
-	if err != nil {
-		return nil, err
-	}
-
+func GetMergedBranches(repo *git.Repository, remoteOrigin, masterBranchName, skipBranches string) ([]string, error) {
 	// Convert skip branches to a set for O(1) lookups
 	var skipSet map[string]bool
 	if skipBranches != "" {
