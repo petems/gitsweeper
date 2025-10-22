@@ -60,13 +60,13 @@ func RemoteBranches(s storer.ReferenceStorer) (storer.ReferenceIter, error) {
 	}, refs), nil
 }
 
-// ParseBranchname splits a branch string of the form "remote/branch" into the remote and branch name.
+// ParseBranchName splits a branch string of the form "remote/branch" into the remote and branch name.
 // If the input contains no slash, the entire input is returned as the remote and the branch name is empty.
-func ParseBranchname(branchString string) (remote, branchname string) {
-	if idx := strings.IndexByte(branchString, '/'); idx > 0 {
-		return branchString[:idx], branchString[idx+1:]
+func ParseBranchName(s string) (remote, branch string) {
+	if before, after, ok := strings.Cut(s, "/"); ok && before != "" {
+		return before, after
 	}
-	return branchString, ""
+	return s, ""
 }
 
 // DeleteBranch deletes the named branch from the given remote by invoking
@@ -282,7 +282,7 @@ func getRemoteBranches(
 			return nil
 		}
 
-		remote, shortBranchName := ParseBranchname(remoteBranchName)
+		remote, shortBranchName := ParseBranchName(remoteBranchName)
 
 		// Filter by origin and skip list
 		if remote == remoteOrigin {
