@@ -22,7 +22,7 @@ func IsStringInSlice(a string, list []string) bool {
 	}
 
 	// For larger slices, check if sorted and use binary search
-	if isSorted(list) {
+	if sort.StringsAreSorted(list) {
 		return binarySearchString(a, list)
 	}
 
@@ -33,16 +33,6 @@ func IsStringInSlice(a string, list []string) bool {
 		}
 	}
 	return false
-}
-
-// isSorted checks if a string slice is sorted (used to determine if binary search is applicable).
-func isSorted(list []string) bool {
-	for i := 1; i < len(list); i++ {
-		if list[i-1] > list[i] {
-			return false
-		}
-	}
-	return true
 }
 
 // binarySearchString performs binary search on a sorted string slice.
