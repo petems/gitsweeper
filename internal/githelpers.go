@@ -163,7 +163,11 @@ func GetCurrentDirAsGitRepo() (*git.Repository, error) {
 }
 
 // GetMergedBranches finds branches that have been merged into the master branch.
-func GetMergedBranches(repo *git.Repository, remoteOrigin, masterBranchName, skipBranches string) ([]string, error) {
+func GetMergedBranches(
+	repo *git.Repository,
+	remoteOrigin, masterBranchName, skipBranches string,
+	opts MergeDetectionOptions,
+) ([]MergedBranchResult, error) {
 	// Convert skip branches to a set for O(1) lookups
 	var skipSet map[string]bool
 	if skipBranches != "" {
@@ -218,18 +222,87 @@ func GetMergedBranches(repo *git.Repository, remoteOrigin, masterBranchName, ski
 	// Early exit if no branches to check
 	if len(remoteBranches) == 0 {
 		LogInfo("No branches found for the specified origin")
-		return []string{}, nil
+		return []MergedBranchResult{}, nil
 	}
 
 	LogInfof("Origin has been set to '%s', checking %d branches", remoteOrigin, len(remoteBranches))
 
-	// Use concurrent processing for large branch sets
-	if len(remoteBranches) > 10 {
-		return findMergedBranchesConcurrent(ctx, masterCommits, remoteBranches)
+	// Determine max commits to check
+	maxCommits := MaxCommitsToCheck
+	if opts.MaxCommits > 0 {
+		maxCommits = opts.MaxCommits
 	}
 
-	// Use sequential processing for smaller sets
-	return findMergedBranchesSequential(ctx, masterCommits, remoteBranches)
+	// Pass 1: Hash matching
+	var hashMatched []string
+	var err2 error
+	if len(remoteBranches) > 10 {
+		hashMatched, err2 = findMergedBranchesConcurrent(ctx, masterCommits, remoteBranches, maxCommits)
+	} else {
+		hashMatched, err2 = findMergedBranchesSequential(ctx, masterCommits, remoteBranches, maxCommits)
+	}
+	if err2 != nil {
+		return nil, err2
+	}
+
+	// Build results from hash matching
+	hashMatchedSet := make(map[string]bool, len(hashMatched))
+	results := make([]MergedBranchResult, 0, len(hashMatched))
+	for _, name := range hashMatched {
+		hashMatchedSet[name] = true
+		results = append(results, MergedBranchResult{Name: name, Method: DetectionHashMatch})
+	}
+
+	// Pass 2: Cherry check for branches not caught by hash matching
+	if !opts.DisableCherry {
+		cherryResults := runCherryPass(repo, remoteOrigin, masterBranchName, remoteBranches, hashMatchedSet)
+		results = append(results, cherryResults...)
+	}
+
+	// Sort by name
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Name < results[j].Name
+	})
+
+	return results, nil
+}
+
+// runCherryPass runs git cherry checks on branches not caught by hash matching.
+func runCherryPass(
+	repo *git.Repository,
+	remoteOrigin, masterBranchName string,
+	remoteBranches []BranchInfo,
+	hashMatchedSet map[string]bool,
+) []MergedBranchResult {
+	var unmatched []BranchInfo
+	for _, branch := range remoteBranches {
+		if !hashMatchedSet[branch.Name] {
+			unmatched = append(unmatched, branch)
+		}
+	}
+	if len(unmatched) == 0 {
+		return nil
+	}
+
+	worktree, wtErr := repo.Worktree()
+	if wtErr != nil {
+		LogInfo("Cannot determine repo path for cherry check (bare or in-memory repo), skipping")
+		return nil
+	}
+	repoPath := worktree.Filesystem.Root()
+
+	upstream := fmt.Sprintf("%s/%s", remoteOrigin, masterBranchName)
+	cherryMatched, cherryErr := CherryCheckBranches(repoPath, upstream, unmatched)
+	if cherryErr != nil {
+		LogInfof("Cherry check failed: %s", cherryErr)
+		return nil
+	}
+
+	var results []MergedBranchResult
+	for _, name := range cherryMatched {
+		results = append(results, MergedBranchResult{Name: name, Method: DetectionCherry})
+	}
+	return results
 }
 
 // getBranchHeads gets all branch heads.
@@ -310,6 +383,7 @@ func findMergedBranchesSequential(
 	ctx context.Context,
 	masterCommits object.CommitIter,
 	branches []BranchInfo,
+	maxCommits int,
 ) ([]string, error) {
 	// Create hash lookup map
 	branchHashMap := make(map[plumbing.Hash][]BranchInfo, len(branches))
@@ -331,8 +405,8 @@ func findMergedBranchesSequential(
 
 		// Limit the number of commits to check
 		commitCount++
-		if commitCount > MaxCommitsToCheck {
-			LogInfof("Reached maximum commit limit (%d), stopping search", MaxCommitsToCheck)
+		if commitCount > maxCommits {
+			LogInfof("Reached maximum commit limit (%d), stopping search", maxCommits)
 			return errors.New("max commits reached")
 		}
 
@@ -374,6 +448,7 @@ func findMergedBranchesConcurrent(
 	ctx context.Context,
 	masterCommits object.CommitIter,
 	branches []BranchInfo,
+	maxCommits int,
 ) ([]string, error) {
 	// Create hash lookup map
 	branchHashMap := make(map[plumbing.Hash][]BranchInfo, len(branches))
@@ -416,7 +491,7 @@ func findMergedBranchesConcurrent(
 
 			// Limit the number of commits to check
 			commitCount++
-			if commitCount > MaxCommitsToCheck {
+			if commitCount > maxCommits {
 				return errors.New("max commits reached")
 			}
 
