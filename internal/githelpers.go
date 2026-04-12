@@ -255,7 +255,7 @@ func GetMergedBranches(
 
 	// Pass 2: Cherry check for branches not caught by hash matching
 	if !opts.DisableCherry {
-		cherryResults := runCherryPass(repo, remoteOrigin, masterBranchName, remoteBranches, hashMatchedSet)
+		cherryResults := runCherryPass(repo, remoteOrigin, masterBranchName, remoteBranches, hashMatchedSet, maxCommits)
 		results = append(results, cherryResults...)
 	}
 
@@ -273,6 +273,7 @@ func runCherryPass(
 	remoteOrigin, masterBranchName string,
 	remoteBranches []BranchInfo,
 	hashMatchedSet map[string]bool,
+	maxCommits int,
 ) []MergedBranchResult {
 	var unmatched []BranchInfo
 	for _, branch := range remoteBranches {
@@ -292,7 +293,7 @@ func runCherryPass(
 	repoPath := worktree.Filesystem.Root()
 
 	upstream := fmt.Sprintf("%s/%s", remoteOrigin, masterBranchName)
-	cherryMatched, cherryErr := CherryCheckBranches(repoPath, upstream, unmatched)
+	cherryMatched, cherryErr := CherryCheckBranches(repoPath, upstream, unmatched, maxCommits)
 	if cherryErr != nil {
 		LogInfof("Cherry check failed: %s", cherryErr)
 		return nil

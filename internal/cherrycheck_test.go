@@ -80,7 +80,7 @@ func TestCherryCheckBranch_SquashMerged(t *testing.T) {
 	run("merge", "--squash", "feature-branch")
 	run("commit", "-m", "squash merge feature-branch")
 
-	merged, err := CherryCheckBranch(dir, "master", "feature-branch")
+	merged, err := CherryCheckBranch(dir, "master", "feature-branch", 0)
 	require.NoError(t, err)
 	assert.True(t, merged, "squash-merged branch should be detected as merged")
 }
@@ -116,7 +116,7 @@ func TestCherryCheckBranch_NotMerged(t *testing.T) {
 
 	run("checkout", "master")
 
-	merged, err := CherryCheckBranch(dir, "master", "unmerged-branch")
+	merged, err := CherryCheckBranch(dir, "master", "unmerged-branch", 0)
 	require.NoError(t, err)
 	assert.False(t, merged, "unmerged branch should not be detected as merged")
 }
@@ -148,7 +148,7 @@ func TestCherryCheckBranch_SameAsMaster(t *testing.T) {
 	run("checkout", "-b", "same-as-master")
 	run("checkout", "master")
 
-	merged, err := CherryCheckBranch(dir, "master", "same-as-master")
+	merged, err := CherryCheckBranch(dir, "master", "same-as-master", 0)
 	require.NoError(t, err)
 	assert.True(t, merged, "branch at same point as master should be detected as merged")
 }
@@ -193,7 +193,7 @@ func TestCherryCheckBranch_MultipleCommitsSquashed(t *testing.T) {
 	run("merge", "--squash", "multi-commit")
 	run("commit", "-m", "squash merge multi-commit")
 
-	merged, err := CherryCheckBranch(dir, "master", "multi-commit")
+	merged, err := CherryCheckBranch(dir, "master", "multi-commit", 0)
 	require.NoError(t, err)
 	assert.True(t, merged, "squash-merged branch with multiple commits should be detected as merged")
 }
@@ -206,7 +206,7 @@ func TestCherryCheckBranch_InvalidRef(t *testing.T) {
 	dir := initTestRepo(t)
 
 	// Invalid branch ref should return false (not merged), not error the whole run.
-	merged, err := CherryCheckBranch(dir, "master", "nonexistent-branch")
+	merged, err := CherryCheckBranch(dir, "master", "nonexistent-branch", 0)
 	assert.False(t, merged)
 	assert.NoError(t, err)
 }
@@ -244,7 +244,7 @@ func TestCherryCheckBranch_ValidationErrors(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			merged, err := CherryCheckBranch(tc.repoPath, tc.upstream, tc.branchRef)
+			merged, err := CherryCheckBranch(tc.repoPath, tc.upstream, tc.branchRef, 0)
 			assert.False(t, merged)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.errMsg)
@@ -306,7 +306,7 @@ func TestCherryCheckBranches_Concurrent(t *testing.T) {
 		{Name: "unmerged-1", Short: "unmerged-1"},
 	}
 
-	results, err := CherryCheckBranches(dir, "master", branches)
+	results, err := CherryCheckBranches(dir, "master", branches, 0)
 	require.NoError(t, err)
 
 	assert.Len(t, results, 2)

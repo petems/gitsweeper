@@ -37,7 +37,7 @@ type MergeDetectionOptions struct {
 // It first tries `git cherry` (works for single-commit squash merges, rebases,
 // and cherry-picks). If that finds unapplied commits, it falls back to comparing
 // the combined branch diff via `git patch-id` (works for multi-commit squash merges).
-func CherryCheckBranch(repoPath, upstream, branchRef string) (bool, error) {
+func CherryCheckBranch(repoPath, upstream, branchRef string, maxCommits int) (bool, error) {
 	if repoPath == "" {
 		return false, errors.New("repo path cannot be empty")
 	}
@@ -64,7 +64,7 @@ func CherryCheckBranch(repoPath, upstream, branchRef string) (bool, error) {
 	}
 
 	// Pass 2: patch-id comparison (handles multi-commit squash merges)
-	return patchIDCheck(repoPath, gitPath, upstream, branchRef)
+	return patchIDCheck(repoPath, gitPath, upstream, branchRef, maxCommits)
 }
 
 // cherryCheck runs `git cherry` and returns true if all commits are applied.
@@ -108,7 +108,10 @@ func cherryCheck(repoPath, gitPath, upstream, branchRef string) (bool, error) {
 // patchIDCheck compares the combined diff of a branch against recent upstream
 // commits using git patch-id. This detects multi-commit squash merges where
 // multiple branch commits were combined into a single upstream commit.
-func patchIDCheck(repoPath, gitPath, upstream, branchRef string) (bool, error) {
+func patchIDCheck(repoPath, gitPath, upstream, branchRef string, maxCommits int) (bool, error) {
+	if maxCommits <= 0 {
+		maxCommits = MaxCommitsToCheck
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -121,9 +124,11 @@ func patchIDCheck(repoPath, gitPath, upstream, branchRef string) (bool, error) {
 
 	// Get all upstream patch-ids in a single pass by piping git log -p
 	// into git patch-id. This uses only 2 processes instead of 2 per commit.
+	maxCountFlag := fmt.Sprintf("--max-count=%d", maxCommits)
+	//nolint:gosec // upstream/branchRef are validated caller inputs; maxCountFlag is derived from an int
 	logCmd := exec.CommandContext(
 		ctx, gitPath, "log", "-p",
-		upstream, "--not", branchRef, "--max-count=500",
+		upstream, "--not", branchRef, maxCountFlag,
 	)
 	logCmd.Dir = repoPath
 
@@ -206,7 +211,7 @@ func extractPatchID(output string) string {
 
 // CherryCheckBranches runs CherryCheckBranch concurrently for multiple branches
 // and returns the names of branches that are fully merged.
-func CherryCheckBranches(repoPath, upstream string, branches []BranchInfo) ([]string, error) {
+func CherryCheckBranches(repoPath, upstream string, branches []BranchInfo, maxCommits int) ([]string, error) {
 	if len(branches) == 0 {
 		return nil, nil
 	}
@@ -229,7 +234,7 @@ func CherryCheckBranches(repoPath, upstream string, branches []BranchInfo) ([]st
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			merged, err := CherryCheckBranch(repoPath, upstream, b.Name)
+			merged, err := CherryCheckBranch(repoPath, upstream, b.Name, maxCommits)
 			if err != nil {
 				LogInfof("Cherry check error for %s: %s", b.Name, err)
 				return
