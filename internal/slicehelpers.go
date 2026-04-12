@@ -38,7 +38,7 @@ func IsStringInSlice(a string, list []string) bool {
 // isSorted checks if a string slice is sorted (used to determine if binary search is applicable).
 func isSorted(list []string) bool {
 	for i := 1; i < len(list); i++ {
-		if list[i-1] > list[i] {
+		if list[i-1] > list[i] { //nolint:gosec // i starts at 1 and i < len(list), so both indices are always in bounds
 			return false
 		}
 	}
