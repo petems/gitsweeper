@@ -119,29 +119,40 @@ func patchIDCheck(repoPath, gitPath, upstream, branchRef string) (bool, error) {
 		return false, nil
 	}
 
-	// Get patch-ids of recent upstream commits and check for a match.
-	logCmd := exec.CommandContext(ctx, gitPath, "log", "--format=%H", upstream, "--not", branchRef, "--max-count=500")
+	// Get all upstream patch-ids in a single pass by piping git log -p
+	// into git patch-id. This uses only 2 processes instead of 2 per commit.
+	logCmd := exec.CommandContext(
+		ctx, gitPath, "log", "-p",
+		upstream, "--not", branchRef, "--max-count=500",
+	)
 	logCmd.Dir = repoPath
-	logOutput, err := logCmd.CombinedOutput()
-	if err != nil {
-		LogInfof("Could not get upstream commits for patch-id check: %v", err)
+
+	patchIDCmd := exec.CommandContext(ctx, gitPath, "patch-id", "--stable")
+	patchIDCmd.Dir = repoPath
+
+	pipe, logPipeErr := logCmd.StdoutPipe()
+	if logPipeErr != nil {
+		return false, nil
+	}
+	patchIDCmd.Stdin = pipe
+
+	if startErr := logCmd.Start(); startErr != nil {
 		return false, nil
 	}
 
-	scanner := bufio.NewScanner(strings.NewReader(strings.TrimSpace(string(logOutput))))
+	patchOutput, patchErr := patchIDCmd.Output()
+	_ = logCmd.Wait() //nolint:errcheck // best-effort cleanup after pipe consumer finished
+
+	if patchErr != nil {
+		LogInfof("Could not get upstream patch-ids: %v", patchErr)
+		return false, nil
+	}
+
+	scanner := bufio.NewScanner(strings.NewReader(string(patchOutput)))
 	for scanner.Scan() {
-		commitHash := strings.TrimSpace(scanner.Text())
-		if commitHash == "" {
-			continue
-		}
-
-		commitPatchID, patchErr := getCommitPatchID(ctx, repoPath, gitPath, commitHash)
-		if patchErr != nil || commitPatchID == "" {
-			continue
-		}
-
-		if commitPatchID == branchPatchID {
-			LogInfof("Branch %s matched upstream commit %s via patch-id", branchRef, commitHash)
+		parts := strings.Fields(scanner.Text())
+		if len(parts) >= 2 && parts[0] == branchPatchID {
+			LogInfof("Branch %s matched upstream commit %s via patch-id", branchRef, parts[1])
 			return true, nil
 		}
 	}
@@ -154,34 +165,6 @@ func getCombinedPatchID(ctx context.Context, repoPath, gitPath, upstream, branch
 	diffRange := upstream + "..." + branchRef
 	//nolint:gosec // upstream and branchRef are validated caller inputs, not user-controlled shell args
 	diffCmd := exec.CommandContext(ctx, gitPath, "diff", diffRange)
-	diffCmd.Dir = repoPath
-
-	patchIDCmd := exec.CommandContext(ctx, gitPath, "patch-id", "--stable")
-	patchIDCmd.Dir = repoPath
-
-	pipe, err := diffCmd.StdoutPipe()
-	if err != nil {
-		return "", err
-	}
-	patchIDCmd.Stdin = pipe
-
-	if startErr := diffCmd.Start(); startErr != nil {
-		return "", startErr
-	}
-
-	patchOutput, patchErr := patchIDCmd.Output()
-	if patchErr != nil {
-		_ = diffCmd.Wait() //nolint:errcheck // best-effort cleanup after pipe consumer failed
-		return "", patchErr
-	}
-	_ = diffCmd.Wait() //nolint:errcheck // diff already fully consumed by patch-id cmd
-
-	return extractPatchID(string(patchOutput)), nil
-}
-
-// getCommitPatchID returns the patch-id of a single commit's diff.
-func getCommitPatchID(ctx context.Context, repoPath, gitPath, commitHash string) (string, error) {
-	diffCmd := exec.CommandContext(ctx, gitPath, "diff-tree", "-p", commitHash)
 	diffCmd.Dir = repoPath
 
 	patchIDCmd := exec.CommandContext(ctx, gitPath, "patch-id", "--stable")
