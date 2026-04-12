@@ -162,7 +162,18 @@ func GetCurrentDirAsGitRepo() (*git.Repository, error) {
 	return repo, nil
 }
 
-// GetMergedBranches finds branches that have been merged into the master branch.
+// GetMergedBranches finds remote branches that have been merged into the master branch.
+// It uses a two-pass detection strategy:
+//
+// Pass 1 (hash matching): Walks the master branch commit history and checks if each
+// remote branch's HEAD commit hash appears in that history. This is fast and catches
+// regular merges and fast-forward merges.
+//
+// Pass 2 (cherry/patch-id): For branches not caught by hash matching, shells out to
+// git cherry and git patch-id to detect squash merges and rebases. Squash merges
+// (commonly used via GitHub's "Squash and merge" button) create a new commit on
+// master with a different hash, so hash matching alone cannot detect them.
+// This pass can be disabled with opts.DisableCherry.
 func GetMergedBranches(
 	repo *git.Repository,
 	remoteOrigin, masterBranchName, skipBranches string,
@@ -267,7 +278,10 @@ func GetMergedBranches(
 	return results, nil
 }
 
-// runCherryPass runs git cherry checks on branches not caught by hash matching.
+// runCherryPass runs git cherry and patch-id checks on branches not caught by hash
+// matching. This detects squash merges (where all branch commits are combined into a
+// single new commit on master) and rebases (where commits are replayed with new hashes).
+// It requires a real filesystem worktree and will be skipped for bare or in-memory repos.
 func runCherryPass(
 	repo *git.Repository,
 	remoteOrigin, masterBranchName string,

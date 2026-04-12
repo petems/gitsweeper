@@ -136,14 +136,56 @@ To delete them, run again with `git-sweep cleanup`
 
 but has a few changes that are tweaked toward my requirements.
 
+## Squash Merge Detection
+
+The original `git-sweep` tool (and gitsweeper's initial implementation) detected merged branches by checking if a branch's tip commit appeared in the master branch's history. This works well for regular merges and fast-forward merges, but **misses squash merges entirely**.
+
+Squash merging is extremely common -- it's the default merge strategy on many GitHub repositories (the "Squash and merge" button on PRs). When you squash-merge, GitHub combines all the branch's commits into a single new commit on master with a different hash. Since the original branch commits never appear in master's history, hash-based detection can't find them.
+
+In real-world testing, **~24% of deletable branches** were only detectable via squash-merge detection.
+
+### How It Works
+
+gitsweeper uses a two-pass detection strategy:
+
+1. **Hash matching** (fast): Walks master's commit history and checks if each branch's HEAD commit appears. Catches regular merges and fast-forward merges.
+
+2. **Cherry/patch-id check** (thorough): For branches not caught by hash matching, uses `git cherry` and `git patch-id` to compare the actual *content* of changes rather than commit hashes:
+   - `git cherry` compares individual commit diffs (handles single-commit squash merges, rebases, and cherry-picks)
+   - `git patch-id` compares the combined branch diff against upstream commits (handles multi-commit squash merges)
+
+This approach works with **any Git hosting provider** -- it uses vanilla Git commands, not GitHub/GitLab APIs.
+
+### Controlling Detection
+
+```bash
+# Disable the cherry/patch-id check (faster, but misses squash merges)
+gitsweeper preview --no-deep-check
+
+# Limit how many commits to search through (default: 10000)
+gitsweeper preview --max-commits 5000
+```
+
+## Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--origin` | `origin` | Name of the remote to clean up |
+| `--master` | `master` | Name of the main/master branch |
+| `--skip` | | Comma-separated list of branches to skip |
+| `--force` | `false` | Skip confirmation prompt during cleanup |
+| `--max-commits` | `10000` | Maximum commits to check in history |
+| `--no-deep-check` | `false` | Disable squash-merge detection |
+| `--debug` | `false` | Enable debug logging |
+
 ## Implementation Details
 
 ### Git Operations & Authentication
 
 `gitsweeper` uses the [go-git](https://github.com/go-git/go-git) library for most Git operations (repository analysis, branch detection, commit traversal) which provides excellent cross-platform compatibility for read operations.
 
-However, for **branch deletion**, `gitsweeper` shells out to the system's `git` command (`git push --delete`) rather than using go-git's push functionality. This design decision addresses the significant complexity of authentication handling. Git authentication in the real world encompasses a huge variety of methods: SSH keys with passphrases, SSH agents, credential helpers, tokens, deploy keys, and more. Attempting to handle all these authentication methods through go-git's API is overly complex and error-prone.
+However, for **branch deletion** and **squash-merge detection**, `gitsweeper` shells out to the system's `git` command. For deletion, this is because go-git has significant complexity and limitations with authenticated push operations. For squash-merge detection, this is because go-git does not implement `git cherry` or `git patch-id`.
 
-By leveraging the system's `git` command for deletion, we automatically inherit the user's existing Git configuration and authentication setup. Your SSH agent, credential helpers, and other authentication mechanisms "just work" without gitsweeper needing to know the details.
+By leveraging the system's `git` command, we automatically inherit the user's existing Git configuration and authentication setup. Your SSH agent, credential helpers, and other authentication mechanisms "just work" without gitsweeper needing to know the details.
 
 For more context on the authentication challenges with go-git, see: https://github.com/go-git/go-git/issues/28

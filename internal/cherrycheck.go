@@ -137,11 +137,13 @@ func patchIDCheck(repoPath, gitPath, upstream, branchRef string, maxCommits int)
 
 	pipe, logPipeErr := logCmd.StdoutPipe()
 	if logPipeErr != nil {
+		LogInfof("Could not create stdout pipe for patch-id scan on %s: %v", branchRef, logPipeErr)
 		return false, nil
 	}
 	patchIDCmd.Stdin = pipe
 
 	if startErr := logCmd.Start(); startErr != nil {
+		LogInfof("Could not start git log for patch-id scan on %s: %v", branchRef, startErr)
 		return false, nil
 	}
 
