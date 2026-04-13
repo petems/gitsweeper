@@ -458,6 +458,64 @@ func findMergedBranchesSequential(
 	return mergedBranches, nil
 }
 
+// produceCommitBatches iterates master commits and sends them in batches to the workers channel.
+func produceCommitBatches(
+	ctx context.Context,
+	masterCommits object.CommitIter,
+	maxCommits int,
+	commitBatches chan<- commitBatch,
+	producerErr chan<- error,
+) {
+	defer close(commitBatches)
+
+	var batch []*object.Commit
+	commitCount := 0
+	batchStartIdx := 0
+
+	err := masterCommits.ForEach(func(commit *object.Commit) error {
+		// Check context for cancellation
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		// Limit the number of commits to check
+		commitCount++
+		if commitCount > maxCommits {
+			return errors.New("max commits reached")
+		}
+
+		batch = append(batch, commit)
+
+		// Send batch when it's full
+		if len(batch) >= BatchSize {
+			select {
+			case commitBatches <- commitBatch{commits: batch, startIdx: batchStartIdx}:
+				batch = make([]*object.Commit, 0, BatchSize)
+				batchStartIdx = commitCount
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+
+		return nil
+	})
+
+	// Send remaining commits
+	if len(batch) > 0 && err == nil {
+		select {
+		case commitBatches <- commitBatch{commits: batch, startIdx: batchStartIdx}:
+		case <-ctx.Done():
+		}
+	}
+
+	// Propagate unexpected iteration errors
+	if err != nil && err.Error() != "max commits reached" {
+		producerErr <- err
+	}
+}
+
 // findMergedBranchesConcurrent processes branches using concurrent workers.
 func findMergedBranchesConcurrent(
 	ctx context.Context,
@@ -490,56 +548,7 @@ func findMergedBranchesConcurrent(
 	}
 
 	// Producer goroutine to batch commits
-	go func() {
-		defer close(commitBatches)
-
-		var batch []*object.Commit
-		commitCount := 0
-		batchStartIdx := 0
-
-		err := masterCommits.ForEach(func(commit *object.Commit) error {
-			// Check context for cancellation
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-			}
-
-			// Limit the number of commits to check
-			commitCount++
-			if commitCount > maxCommits {
-				return errors.New("max commits reached")
-			}
-
-			batch = append(batch, commit)
-
-			// Send batch when it's full
-			if len(batch) >= BatchSize {
-				select {
-				case commitBatches <- commitBatch{commits: batch, startIdx: batchStartIdx}:
-					batch = make([]*object.Commit, 0, BatchSize)
-					batchStartIdx = commitCount
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			}
-
-			return nil
-		})
-
-		// Send remaining commits
-		if len(batch) > 0 && err == nil {
-			select {
-			case commitBatches <- commitBatch{commits: batch, startIdx: batchStartIdx}:
-			case <-ctx.Done():
-			}
-		}
-
-		// Propagate unexpected iteration errors
-		if err != nil && err.Error() != "max commits reached" {
-			producerErr <- err
-		}
-	}()
+	go produceCommitBatches(ctx, masterCommits, maxCommits, commitBatches, producerErr)
 
 	// Wait for workers and collect results
 	go func() {
