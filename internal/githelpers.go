@@ -474,6 +474,7 @@ func findMergedBranchesConcurrent(
 	// Channel for commit batches
 	commitBatches := make(chan commitBatch, ConcurrentWorkers*2)
 	results := make(chan []string, ConcurrentWorkers)
+	producerErr := make(chan error, 1)
 
 	// Start worker goroutines
 	var wg sync.WaitGroup
@@ -533,6 +534,11 @@ func findMergedBranchesConcurrent(
 			case <-ctx.Done():
 			}
 		}
+
+		// Propagate unexpected iteration errors
+		if err != nil && err.Error() != "max commits reached" {
+			producerErr <- err
+		}
 	}()
 
 	// Wait for workers and collect results
@@ -554,15 +560,22 @@ func findMergedBranchesConcurrent(
 		}
 	}
 
-	sort.Strings(allMerged)
+	// Check for producer errors (iteration failures)
+	select {
+	case err := <-producerErr:
+		return nil, fmt.Errorf("looking for merged commits failed: %w", err)
+	default:
+	}
 
 	// Check if context was cancelled
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	default:
-		return allMerged, nil
 	}
+
+	sort.Strings(allMerged)
+	return allMerged, nil
 }
 
 // processCommitBatches processes batches of commits in a worker goroutine.
