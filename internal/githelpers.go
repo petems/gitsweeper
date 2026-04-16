@@ -466,6 +466,7 @@ func produceCommitBatches(
 	commitBatches chan<- commitBatch,
 	producerErr chan<- error,
 ) {
+	defer close(producerErr)
 	defer close(commitBatches)
 
 	var batch []*object.Commit
@@ -569,11 +570,11 @@ func findMergedBranchesConcurrent(
 		}
 	}
 
-	// Check for producer errors (iteration failures)
-	select {
-	case err := <-producerErr:
+	// Check for producer errors (iteration failures). The producer always
+	// closes producerErr before returning, so this blocking receive either
+	// yields a propagated error or unblocks once the channel is closed.
+	if err, ok := <-producerErr; ok {
 		return nil, fmt.Errorf("looking for merged commits failed: %w", err)
-	default:
 	}
 
 	// Check if context was cancelled
