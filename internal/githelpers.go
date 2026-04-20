@@ -162,8 +162,23 @@ func GetCurrentDirAsGitRepo() (*git.Repository, error) {
 	return repo, nil
 }
 
-// GetMergedBranches finds branches that have been merged into the master branch.
-func GetMergedBranches(repo *git.Repository, remoteOrigin, masterBranchName, skipBranches string) ([]string, error) {
+// GetMergedBranches finds remote branches that have been merged into the master branch.
+// It uses a two-pass detection strategy:
+//
+// Pass 1 (hash matching): Walks the master branch commit history and checks if each
+// remote branch's HEAD commit hash appears in that history. This is fast and catches
+// regular merges and fast-forward merges.
+//
+// Pass 2 (cherry/patch-id): For branches not caught by hash matching, shells out to
+// git cherry and git patch-id to detect squash merges and rebases. Squash merges
+// (commonly used via GitHub's "Squash and merge" button) create a new commit on
+// master with a different hash, so hash matching alone cannot detect them.
+// This pass can be disabled with opts.DisableCherry.
+func GetMergedBranches(
+	repo *git.Repository,
+	remoteOrigin, masterBranchName, skipBranches string,
+	opts MergeDetectionOptions,
+) ([]MergedBranchResult, error) {
 	// Convert skip branches to a set for O(1) lookups
 	var skipSet map[string]bool
 	if skipBranches != "" {
@@ -218,18 +233,91 @@ func GetMergedBranches(repo *git.Repository, remoteOrigin, masterBranchName, ski
 	// Early exit if no branches to check
 	if len(remoteBranches) == 0 {
 		LogInfo("No branches found for the specified origin")
-		return []string{}, nil
+		return []MergedBranchResult{}, nil
 	}
 
 	LogInfof("Origin has been set to '%s', checking %d branches", remoteOrigin, len(remoteBranches))
 
-	// Use concurrent processing for large branch sets
-	if len(remoteBranches) > 10 {
-		return findMergedBranchesConcurrent(ctx, masterCommits, remoteBranches)
+	// Determine max commits to check
+	maxCommits := MaxCommitsToCheck
+	if opts.MaxCommits > 0 {
+		maxCommits = opts.MaxCommits
 	}
 
-	// Use sequential processing for smaller sets
-	return findMergedBranchesSequential(ctx, masterCommits, remoteBranches)
+	// Pass 1: Hash matching
+	var hashMatched []string
+	var err2 error
+	if len(remoteBranches) > 10 {
+		hashMatched, err2 = findMergedBranchesConcurrent(ctx, masterCommits, remoteBranches, maxCommits)
+	} else {
+		hashMatched, err2 = findMergedBranchesSequential(ctx, masterCommits, remoteBranches, maxCommits)
+	}
+	if err2 != nil {
+		return nil, err2
+	}
+
+	// Build results from hash matching
+	hashMatchedSet := make(map[string]bool, len(hashMatched))
+	results := make([]MergedBranchResult, 0, len(hashMatched))
+	for _, name := range hashMatched {
+		hashMatchedSet[name] = true
+		results = append(results, MergedBranchResult{Name: name, Method: DetectionHashMatch})
+	}
+
+	// Pass 2: Cherry check for branches not caught by hash matching
+	if !opts.DisableCherry {
+		cherryResults := runCherryPass(repo, remoteOrigin, masterBranchName, remoteBranches, hashMatchedSet, maxCommits)
+		results = append(results, cherryResults...)
+	}
+
+	// Sort by name
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Name < results[j].Name
+	})
+
+	return results, nil
+}
+
+// runCherryPass runs git cherry and patch-id checks on branches not caught by hash
+// matching. This detects squash merges (where all branch commits are combined into a
+// single new commit on master) and rebases (where commits are replayed with new hashes).
+// It requires a real filesystem worktree and will be skipped for bare or in-memory repos.
+func runCherryPass(
+	repo *git.Repository,
+	remoteOrigin, masterBranchName string,
+	remoteBranches []BranchInfo,
+	hashMatchedSet map[string]bool,
+	maxCommits int,
+) []MergedBranchResult {
+	var unmatched []BranchInfo
+	for _, branch := range remoteBranches {
+		if !hashMatchedSet[branch.Name] {
+			unmatched = append(unmatched, branch)
+		}
+	}
+	if len(unmatched) == 0 {
+		return nil
+	}
+
+	worktree, wtErr := repo.Worktree()
+	if wtErr != nil {
+		LogInfo("Cannot determine repo path for cherry check (bare or in-memory repo), skipping")
+		return nil
+	}
+	repoPath := worktree.Filesystem.Root()
+
+	upstream := fmt.Sprintf("%s/%s", remoteOrigin, masterBranchName)
+	cherryMatched, cherryErr := CherryCheckBranches(repoPath, upstream, unmatched, maxCommits)
+	if cherryErr != nil {
+		LogInfof("Cherry check failed: %s", cherryErr)
+		return nil
+	}
+
+	var results []MergedBranchResult
+	for _, name := range cherryMatched {
+		results = append(results, MergedBranchResult{Name: name, Method: DetectionCherry})
+	}
+	return results
 }
 
 // getBranchHeads gets all branch heads.
@@ -310,6 +398,7 @@ func findMergedBranchesSequential(
 	ctx context.Context,
 	masterCommits object.CommitIter,
 	branches []BranchInfo,
+	maxCommits int,
 ) ([]string, error) {
 	// Create hash lookup map
 	branchHashMap := make(map[plumbing.Hash][]BranchInfo, len(branches))
@@ -331,8 +420,8 @@ func findMergedBranchesSequential(
 
 		// Limit the number of commits to check
 		commitCount++
-		if commitCount > MaxCommitsToCheck {
-			LogInfof("Reached maximum commit limit (%d), stopping search", MaxCommitsToCheck)
+		if commitCount > maxCommits {
+			LogInfof("Reached maximum commit limit (%d), stopping search", maxCommits)
 			return errors.New("max commits reached")
 		}
 
@@ -369,11 +458,71 @@ func findMergedBranchesSequential(
 	return mergedBranches, nil
 }
 
+// produceCommitBatches iterates master commits and sends them in batches to the workers channel.
+func produceCommitBatches(
+	ctx context.Context,
+	masterCommits object.CommitIter,
+	maxCommits int,
+	commitBatches chan<- commitBatch,
+	producerErr chan<- error,
+) {
+	defer close(producerErr)
+	defer close(commitBatches)
+
+	var batch []*object.Commit
+	commitCount := 0
+	batchStartIdx := 0
+
+	err := masterCommits.ForEach(func(commit *object.Commit) error {
+		// Check context for cancellation
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		// Limit the number of commits to check
+		commitCount++
+		if commitCount > maxCommits {
+			return errors.New("max commits reached")
+		}
+
+		batch = append(batch, commit)
+
+		// Send batch when it's full
+		if len(batch) >= BatchSize {
+			select {
+			case commitBatches <- commitBatch{commits: batch, startIdx: batchStartIdx}:
+				batch = make([]*object.Commit, 0, BatchSize)
+				batchStartIdx = commitCount
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+
+		return nil
+	})
+
+	// Send remaining commits
+	if len(batch) > 0 && err == nil {
+		select {
+		case commitBatches <- commitBatch{commits: batch, startIdx: batchStartIdx}:
+		case <-ctx.Done():
+		}
+	}
+
+	// Propagate unexpected iteration errors
+	if err != nil && err.Error() != "max commits reached" {
+		producerErr <- err
+	}
+}
+
 // findMergedBranchesConcurrent processes branches using concurrent workers.
 func findMergedBranchesConcurrent(
 	ctx context.Context,
 	masterCommits object.CommitIter,
 	branches []BranchInfo,
+	maxCommits int,
 ) ([]string, error) {
 	// Create hash lookup map
 	branchHashMap := make(map[plumbing.Hash][]BranchInfo, len(branches))
@@ -384,6 +533,7 @@ func findMergedBranchesConcurrent(
 	// Channel for commit batches
 	commitBatches := make(chan commitBatch, ConcurrentWorkers*2)
 	results := make(chan []string, ConcurrentWorkers)
+	producerErr := make(chan error, 1)
 
 	// Start worker goroutines
 	var wg sync.WaitGroup
@@ -399,51 +549,7 @@ func findMergedBranchesConcurrent(
 	}
 
 	// Producer goroutine to batch commits
-	go func() {
-		defer close(commitBatches)
-
-		var batch []*object.Commit
-		commitCount := 0
-		batchStartIdx := 0
-
-		err := masterCommits.ForEach(func(commit *object.Commit) error {
-			// Check context for cancellation
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-			}
-
-			// Limit the number of commits to check
-			commitCount++
-			if commitCount > MaxCommitsToCheck {
-				return errors.New("max commits reached")
-			}
-
-			batch = append(batch, commit)
-
-			// Send batch when it's full
-			if len(batch) >= BatchSize {
-				select {
-				case commitBatches <- commitBatch{commits: batch, startIdx: batchStartIdx}:
-					batch = make([]*object.Commit, 0, BatchSize)
-					batchStartIdx = commitCount
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			}
-
-			return nil
-		})
-
-		// Send remaining commits
-		if len(batch) > 0 && err == nil {
-			select {
-			case commitBatches <- commitBatch{commits: batch, startIdx: batchStartIdx}:
-			case <-ctx.Done():
-			}
-		}
-	}()
+	go produceCommitBatches(ctx, masterCommits, maxCommits, commitBatches, producerErr)
 
 	// Wait for workers and collect results
 	go func() {
@@ -464,15 +570,22 @@ func findMergedBranchesConcurrent(
 		}
 	}
 
-	sort.Strings(allMerged)
+	// Check for producer errors (iteration failures). The producer always
+	// closes producerErr before returning, so this blocking receive either
+	// yields a propagated error or unblocks once the channel is closed.
+	if err, ok := <-producerErr; ok {
+		return nil, fmt.Errorf("looking for merged commits failed: %w", err)
+	}
 
 	// Check if context was cancelled
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	default:
-		return allMerged, nil
 	}
+
+	sort.Strings(allMerged)
+	return allMerged, nil
 }
 
 // processCommitBatches processes batches of commits in a worker goroutine.
