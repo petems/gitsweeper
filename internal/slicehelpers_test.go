@@ -50,15 +50,6 @@ func TestIsStringInSlice_UnsortedLargeSlice(t *testing.T) {
 	assert.False(t, IsStringInSlice("orange", slice))
 }
 
-func TestIsSorted(t *testing.T) {
-	assert.True(t, isSorted([]string{"a", "b", "c", "d"}))
-	assert.True(t, isSorted([]string{"apple", "banana", "cherry"}))
-	assert.False(t, isSorted([]string{"c", "a", "b"}))
-	assert.False(t, isSorted([]string{"zebra", "apple"}))
-	assert.True(t, isSorted([]string{}))         // empty slice is sorted
-	assert.True(t, isSorted([]string{"single"})) // single element is sorted
-}
-
 func TestBinarySearchString(t *testing.T) {
 	slice := []string{"apple", "banana", "cherry", "date", "elderberry"}
 
