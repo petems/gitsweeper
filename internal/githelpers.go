@@ -79,8 +79,8 @@ func ParseBranchName(s string) (remote, branch string) {
 // existing authentication configuration automatically.
 // See: https://github.com/go-git/go-git/issues/28
 //
-// The function validates inputs (non-empty remote and branchShortName, branchShortName
-// must not start with '-'), verifies git is available, sets GIT_TERMINAL_PROMPT=0 for
+// The function validates inputs (non-empty remote and branchShortName, neither
+// must start with '-'), verifies git is available, sets GIT_TERMINAL_PROMPT=0 for
 // non-interactive contexts, and runs with a 30-second timeout. Returns a timeout-specific
 // error if context deadline is exceeded, otherwise returns an error containing the
 // trimmed command output for diagnostics.
@@ -88,6 +88,9 @@ func DeleteBranch(repo *git.Repository, remote, branchShortName string) error {
 	// Validate inputs
 	if remote == "" {
 		return errors.New("remote name cannot be empty")
+	}
+	if strings.HasPrefix(remote, "-") {
+		return fmt.Errorf("remote name cannot start with '-': %s", remote)
 	}
 	if branchShortName == "" {
 		return errors.New("branch name cannot be empty")
@@ -124,7 +127,7 @@ func DeleteBranch(repo *git.Repository, remote, branchShortName string) error {
 
 	if err != nil {
 		// Check for timeout specifically
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		if errors.Is(err, context.DeadlineExceeded) {
 			return fmt.Errorf("timeout deleting branch %s on remote %s after 30s: %w\nOutput: %s",
 				branchShortName, remote, err, trimmedOutput)
 		}
