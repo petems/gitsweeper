@@ -1,3 +1,11 @@
+// Package main implements the gitsweeper CLI for cleaning up merged remote git branches.
+//
+// gitsweeper exposes two subcommands, preview and cleanup. Both detect remote branches
+// that have already been merged into the configured main branch using a two-pass strategy:
+// commit-hash reachability via go-git, followed by a git cherry / git patch-id check to
+// catch squash merges and rebases. cleanup additionally deletes the matched branches by
+// shelling out to git push --delete so that the user's existing git authentication is
+// reused. See https://gitsweeper.readthedocs.io/ for full documentation.
 package main
 
 import (

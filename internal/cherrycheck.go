@@ -1,3 +1,8 @@
+// Package internal provides the helper packages used by the gitsweeper CLI:
+// git repository operations (githelpers.go), squash-merge detection via
+// git cherry and git patch-id (cherrycheck.go), confirmation prompts
+// (prompthelpers.go), lightweight logging (loghelpers.go), and slice/set
+// utilities (slicehelpers.go). Nothing here is intended for external import.
 package internal
 
 import (

@@ -25,4 +25,8 @@ gitsweeper-*
 bin/*
 tmp/*
 dist/*
+
+# MkDocs build output
+site/
+
 # End of https://www.gitignore.io/api/go,visualstudiocode
