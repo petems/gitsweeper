@@ -37,7 +37,8 @@ func IsStringInSlice(a string, list []string) bool {
 
 // binarySearchString performs binary search on a sorted string slice.
 func binarySearchString(target string, list []string) bool {
-	return sort.SearchStrings(list, target) < len(list) && list[sort.SearchStrings(list, target)] == target
+	i := sort.SearchStrings(list, target)
+	return i < len(list) && list[i] == target
 }
 
 // StringSliceToSet converts a string slice to a map[string]bool for O(1) lookups
