@@ -45,8 +45,8 @@ gitsweeper preview --master main
 # Use a different remote
 gitsweeper preview --origin upstream
 
-# Skip specific branches (comma-separated)
-gitsweeper preview --skip "release/*,hotfix-prod"
+# Skip specific branches (comma-separated, exact names — no globs)
+gitsweeper preview --skip "release-2024,hotfix-prod"
 
 # Faster but less thorough — skips squash-merge detection
 gitsweeper preview --no-deep-check
