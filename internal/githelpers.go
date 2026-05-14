@@ -138,6 +138,9 @@ func DeleteBranch(repo *git.Repository, remote, branchShortName string) error {
 	return nil
 }
 
+// RemoteBranchesToStrings returns the configured remote names from a slice of
+// go-git remotes. It preserves input ordering and is used to validate that the
+// origin requested by the user actually exists in the repository.
 func RemoteBranchesToStrings(gitRemoteArray []*git.Remote) []string {
 	stringArray := make([]string, len(gitRemoteArray))
 	for i, v := range gitRemoteArray {
@@ -146,6 +149,9 @@ func RemoteBranchesToStrings(gitRemoteArray []*git.Remote) []string {
 	return stringArray
 }
 
+// GetCurrentDirAsGitRepo opens the current working directory as a go-git
+// repository. It returns an error if the working directory cannot be
+// determined or is not a git repository.
 func GetCurrentDirAsGitRepo() (*git.Repository, error) {
 	LogInfo("Getting current working directory")
 
