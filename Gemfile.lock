@@ -46,8 +46,10 @@ GEM
     docker-api (2.2.0)
       excon (>= 0.47.0)
       multi_json
-    excon (0.109.0)
+    excon (1.5.0)
+      logger
     ffi (1.16.3)
+    logger (1.7.0)
     method_source (1.0.0)
     mini_mime (1.1.5)
     multi_json (1.15.0)
